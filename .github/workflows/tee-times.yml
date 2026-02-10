@@ -3,6 +3,10 @@ name: Golf tee time lookup
 on:
   workflow_dispatch:
     inputs:
+      debug:
+        description: "Save debug HTML/screenshots (true/false)"
+        required: false
+        default: "false"
       play_date:
         description: "Date to search (YYYY-MM-DD)"
         required: true
@@ -40,6 +44,7 @@ jobs:
           PLAY_DATE: ${{ inputs.play_date }}
           MIN_PLAYERS: ${{ inputs.min_players }}
           LATEST_TIME: ${{ inputs.latest_time }}
+          DEBUG: ${{ inputs.debug }}
         run: |
           python tee_times.py
 
@@ -47,3 +52,11 @@ jobs:
         if: always()
         run: |
           cat tee_time_summary.md >> $GITHUB_STEP_SUMMARY
+          
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-artifacts
+          path: debug/
+          if-no-files-found: ignore
