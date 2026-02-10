@@ -76,9 +76,23 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         if not tds:
             continue
 
-        # --- NEW: ignore 9-hole times ---
         row_text = " ".join(tds).lower()
-        if any(k in row_text for k in ["9 hole", "9 holes", "9h"]):
+
+        # Drop obvious 9-hole labels (more variants)
+        nine_markers = [
+            "9 hole", "9 holes", "9-hole", "9holes", "9h",
+            "front 9", "back 9", "front nine", "back nine",
+            "nine hole", "nine holes"
+        ]
+        if any(m in row_text for m in nine_markers):
+            continue
+
+        # Keep only rows that clearly indicate 18 holes
+        eighteen_markers = [
+            "18 hole", "18 holes", "18-hole", "18holes", "18h",
+            "full 18", "full course"
+        ]
+        if not any(m in row_text for m in eighteen_markers):
             continue
 
         time_cell = None
