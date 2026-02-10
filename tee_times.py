@@ -1,5 +1,10 @@
 import os
 import re
+DEBUG = os.environ.get("DEBUG", "false").strip().lower() == "true"
+
+def ensure_debug_dir():
+    if DEBUG:
+        os.makedirs("debug", exist_ok=True)
 from dataclasses import dataclass
 from datetime import datetime, time
 from typing import List, Optional
@@ -65,6 +70,11 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         html = page.content()
+        ensure_debug_dir()
+        if DEBUG:
+            page.screenshot(path=f"debug/hamersley_{play_date}.png", full_page=True)
+            with open(f"debug/hamersley_{play_date}.html", "w", encoding="utf-8") as f:
+                f.write(html)
         browser.close()
 
     soup = BeautifulSoup(html, "lxml")
@@ -165,6 +175,12 @@ def scrape_miclub_public_calendar(
                     pass
 
         html = page.content()
+        ensure_debug_dir()
+        if DEBUG:
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+            page.screenshot(path=f"debug/{safe}_{play_date}.png", full_page=True)
+            with open(f"debug/{safe}_{play_date}.html", "w", encoding="utf-8") as f:
+                f.write(html)
         browser.close()
 
     soup = BeautifulSoup(html, "lxml")
