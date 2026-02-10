@@ -1,0 +1,49 @@
+name: Golf tee time lookup
+
+on:
+  workflow_dispatch:
+    inputs:
+      play_date:
+        description: "Date to search (YYYY-MM-DD)"
+        required: true
+      min_players:
+        description: "Minimum players"
+        required: false
+        default: "2"
+      latest_time:
+        description: "Latest tee time (24h HH:MM, local course time)"
+        required: false
+        default: "10:00"
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run lookup
+        env:
+          PLAY_DATE: ${{ inputs.play_date }}
+          MIN_PLAYERS: ${{ inputs.min_players }}
+          LATEST_TIME: ${{ inputs.latest_time }}
+        run: |
+          python tee_times.py
+
+      - name: Write summary to job
+        if: always()
+        run: |
+          cat tee_time_summary.md >> $GITHUB_STEP_SUMMARY
