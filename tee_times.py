@@ -179,7 +179,59 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             continue
 
         booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
+        
+        # NEW: open the slot page and confirm it supports min_players
+        slot_supports_min = True
+        slot_players_hint = players_hint
 
+        try:
+            with sync_playwright() as p2:
+                b2 = p2.chromium.launch(headless=True)
+                pg2 = b2.new_page()
+                pg2.goto(booking_url, wait_until="domcontentloaded", timeout=60_000)
+                pg2.wait_for_timeout(1200)
+                slot_html = pg2.content()
+                b2.close()
+
+            slot_soup = BeautifulSoup(slot_html, "lxml")
+            page_text = slot_soup.get_text(" ", strip=True).lower()
+
+            # Common patterns: "1 player", "2 players", "1 to 4 players", dropdown options, etc.
+            # If it explicitly mentions only 1 player, reject for min_players >= 2
+            if min_players >= 2 and re.search(r"\b1\s+player\b", page_text) and not re.search(r"\b2\s+player", page_text):
+                slot_supports_min = False
+
+            # If we can find a "to X players" hint, use it
+            m_range = re.search(r"\b(\d+)\s*(?:to|-)\s*(\d+)\s*players?\b", page_text)
+            if m_range:
+                hi = int(m_range.group(2))
+                slot_supports_min = hi >= min_players
+                slot_players_hint = m_range.group(0)
+
+            # Or “Up to X players”
+            m_upto = re.search(r"\bup to\s*(\d+)\s*players?\b", page_text)
+            if m_upto:
+                hi = int(m_upto.group(1))
+                slot_supports_min = hi >= min_players
+                slot_players_hint = m_upto.group(0)
+
+            # Or explicit list of player counts (e.g., dropdown)
+            # If we see any number >= min_players next to the word player(s), treat as ok.
+            if not m_range and not m_upto:
+                nums = [int(x) for x in re.findall(r"\b(\d+)\s*players?\b", page_text)]
+                if nums:
+                    slot_supports_min = max(nums) >= min_players
+                    slot_players_hint = f"players up to {max(nums)}"
+
+        except Exception:
+            # If validation fails due to a transient page issue, keep the slot (conservative)
+            slot_supports_min = True
+
+        if not slot_supports_min:
+            continue
+
+        # Prefer the more specific hint found on the slot page
+        players_hint = slot_players_hint
         players_hint = tr_text if "player" in tr_text.lower() else None
         if not looks_like_players_ok(players_hint, min_players):
             continue
