@@ -76,6 +76,11 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         if not tds:
             continue
 
+        # --- NEW: ignore 9-hole times ---
+        row_text = " ".join(tds).lower()
+        if any(k in row_text for k in ["9 hole", "9 holes", "9h"]):
+            continue
+
         time_cell = None
         for cell in tds:
             if time_re.match(cell):
