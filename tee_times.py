@@ -218,6 +218,7 @@ def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int
         "",
         f"- Date: **{play_date}**",
         f"- Filter: **{min_players}+ players**, **before {latest_time}**",
+        "- Tip: right-click a link (or Ctrl/Cmd-click) to open it in a new tab.",
         "",
     ]
 
