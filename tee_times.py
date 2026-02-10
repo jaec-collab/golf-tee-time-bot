@@ -69,9 +69,12 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+
+        # Quick18 sometimes renders a bit after DOMContentLoaded
+        page.wait_for_timeout(1500)
+
         html = page.content()
 
-        # optional debug capture (if you added DEBUG earlier)
         try:
             ensure_debug_dir()
             if DEBUG:
@@ -86,41 +89,69 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
     soup = BeautifulSoup(html, "lxml")
     results: List[TeeTime] = []
 
-    # Find the first table that looks like the tee time matrix
-    table = soup.find("table")
-    if not table:
+    def expand_cells(cells) -> List[BeautifulSoup]:
+        """Expand a row's cells by colspan so indexes align with logical columns."""
+        expanded = []
+        for c in cells:
+            colspan = 1
+            try:
+                colspan = int(c.get("colspan", 1))
+            except Exception:
+                colspan = 1
+            expanded.extend([c] * max(colspan, 1))
+        return expanded
+
+    # Pick the table that actually looks like the tee time matrix
+    candidate_tables = soup.find_all("table")
+    target_table = None
+    for t in candidate_tables:
+        t_text = t.get_text(" ", strip=True).lower()
+        if ("18 holes" in t_text) and ("9 holes" in t_text) and ("select" in t_text):
+            target_table = t
+            break
+
+    if not target_table:
         return results
 
-    # Identify header columns so we can locate the "18 Holes" column
-    header_tr = table.find("tr")
-    headers = []
-    if header_tr:
-        headers = [th.get_text(" ", strip=True).lower() for th in header_tr.find_all(["th", "td"])]
+    # Find the header row that contains "9 Holes" / "18 Holes"
+    header_row = None
+    for tr in target_table.find_all("tr")[:6]:
+        tr_text = tr.get_text(" ", strip=True).lower()
+        if ("18 holes" in tr_text) or ("9 holes" in tr_text):
+            header_row = tr
 
-    def find_col_index(keywords: List[str]) -> Optional[int]:
+    if not header_row:
+        return results
+
+    header_cells = expand_cells(header_row.find_all(["th", "td"]))
+    headers = [c.get_text(" ", strip=True).lower() for c in header_cells]
+
+    def find_col_idx_contains(needle: str) -> Optional[int]:
         for i, h in enumerate(headers):
-            if all(k in h for k in keywords):
+            if needle in h:
                 return i
         return None
 
-    col_18 = find_col_index(["18", "hole"])
-    col_9 = find_col_index(["9", "hole"])  # not strictly needed, but useful for sanity
-
-    # If we can't find an 18-holes column header, fall back to old behavior (but usually this exists)
+    col_18 = find_col_idx_contains("18 holes")
     if col_18 is None:
-        col_18 = -1  # will force "no select link found" and return empty results
+        # Some variants show "18 Hole" instead
+        for i, h in enumerate(headers):
+            if ("18" in h) and ("hole" in h):
+                col_18 = i
+                break
+
+    if col_18 is None:
+        return results
 
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
-    # Iterate over data rows (skip header row)
-    for tr in table.find_all("tr")[1:]:
-        cells = tr.find_all(["td", "th"])
-        if not cells:
+    # Data rows: only those that have a Select somewhere
+    for tr in target_table.find_all("tr"):
+        tr_text = tr.get_text(" ", strip=True)
+        if "select" not in tr_text.lower():
             continue
 
-        # Extract a tee time from anywhere in the row
-        row_text = tr.get_text(" ", strip=True)
-        m = time_re.search(row_text)
+        m = time_re.search(tr_text)
         if not m:
             continue
 
@@ -128,23 +159,28 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        # Require that the 18-holes column contains a clickable "Select"
-        if col_18 >= len(cells):
+        row_cells = expand_cells(tr.find_all(["td", "th"]))
+        if col_18 >= len(row_cells):
             continue
 
-        cell_18 = cells[col_18]
+        cell_18 = row_cells[col_18]
         select_link = cell_18.find("a", string=re.compile(r"select", re.IGNORECASE))
-        if not select_link or not select_link.get("href"):
-            continue  # no 18-hole availability
 
-        href = select_link["href"]
+        # Sometimes it's a button/input, not an <a>
+        if not select_link:
+            select_link = cell_18.find("a") or cell_18.find("button") or cell_18.find("input")
+
+        href = None
+        if select_link and select_link.get("href"):
+            href = select_link["href"]
+
+        # If there's no link href, still treat it as not actionable for now
+        if not href:
+            continue
+
         booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
 
-        # Players hint (if present somewhere in row)
-        players_hint = None
-        if "player" in row_text.lower():
-            players_hint = row_text
-
+        players_hint = tr_text if "player" in tr_text.lower() else None
         if not looks_like_players_ok(players_hint, min_players):
             continue
 
@@ -158,7 +194,6 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             )
         )
 
-    # De-dupe by time
     uniq = {}
     for r in results:
         uniq[(r.course, r.play_date, r.tee_time)] = r
