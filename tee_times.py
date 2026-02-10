@@ -70,67 +70,83 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         html = page.content()
-        ensure_debug_dir()
-        if DEBUG:
-            page.screenshot(path=f"debug/hamersley_{play_date}.png", full_page=True)
-            with open(f"debug/hamersley_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(html)
+
+        # optional debug capture (if you added DEBUG earlier)
+        try:
+            ensure_debug_dir()
+            if DEBUG:
+                page.screenshot(path=f"debug/hamersley_{play_date}.png", full_page=True)
+                with open(f"debug/hamersley_{play_date}.html", "w", encoding="utf-8") as f:
+                    f.write(html)
+        except Exception:
+            pass
+
         browser.close()
 
     soup = BeautifulSoup(html, "lxml")
     results: List[TeeTime] = []
-    time_re = re.compile(r"^\s*\d{1,2}:\d{2}\s*(AM|PM)\s*$", re.IGNORECASE)
 
-    for tr in soup.find_all("tr"):
-        tds = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-        if not tds:
+    # Find the first table that looks like the tee time matrix
+    table = soup.find("table")
+    if not table:
+        return results
+
+    # Identify header columns so we can locate the "18 Holes" column
+    header_tr = table.find("tr")
+    headers = []
+    if header_tr:
+        headers = [th.get_text(" ", strip=True).lower() for th in header_tr.find_all(["th", "td"])]
+
+    def find_col_index(keywords: List[str]) -> Optional[int]:
+        for i, h in enumerate(headers):
+            if all(k in h for k in keywords):
+                return i
+        return None
+
+    col_18 = find_col_index(["18", "hole"])
+    col_9 = find_col_index(["9", "hole"])  # not strictly needed, but useful for sanity
+
+    # If we can't find an 18-holes column header, fall back to old behavior (but usually this exists)
+    if col_18 is None:
+        col_18 = -1  # will force "no select link found" and return empty results
+
+    time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
+
+    # Iterate over data rows (skip header row)
+    for tr in table.find_all("tr")[1:]:
+        cells = tr.find_all(["td", "th"])
+        if not cells:
             continue
 
-        row_text = " ".join(tds).lower()
-
-        # Drop obvious 9-hole labels (more variants)
-        nine_markers = [
-            "9 hole", "9 holes", "9-hole", "9holes", "9h",
-            "front 9", "back 9", "front nine", "back nine",
-            "nine hole", "nine holes"
-        ]
-        if any(m in row_text for m in nine_markers):
+        # Extract a tee time from anywhere in the row
+        row_text = tr.get_text(" ", strip=True)
+        m = time_re.search(row_text)
+        if not m:
             continue
 
-        # Keep only rows that clearly indicate 18 holes
-        eighteen_markers = [
-            "18 hole", "18 holes", "18-hole", "18holes", "18h",
-            "full 18", "full course"
-        ]
-        if not any(m in row_text for m in eighteen_markers):
-            continue
-
-        time_cell = None
-        for cell in tds:
-            if time_re.match(cell):
-                time_cell = cell
-                break
-        if not time_cell:
-            continue
-
-        hhmm = ampm_to_24h(time_cell)
+        hhmm = ampm_to_24h(m.group(1))
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
+        # Require that the 18-holes column contains a clickable "Select"
+        if col_18 >= len(cells):
+            continue
+
+        cell_18 = cells[col_18]
+        select_link = cell_18.find("a", string=re.compile(r"select", re.IGNORECASE))
+        if not select_link or not select_link.get("href"):
+            continue  # no 18-hole availability
+
+        href = select_link["href"]
+        booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
+
+        # Players hint (if present somewhere in row)
         players_hint = None
-        for cell in tds:
-            if "player" in cell.lower():
-                players_hint = cell
-                break
+        if "player" in row_text.lower():
+            players_hint = row_text
 
         if not looks_like_players_ok(players_hint, min_players):
             continue
-
-        link = tr.find("a", string=re.compile(r"select", re.IGNORECASE))
-        booking_url = url
-        if link and link.get("href"):
-            href = link["href"]
-            booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
 
         results.append(
             TeeTime(
@@ -142,11 +158,11 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             )
         )
 
+    # De-dupe by time
     uniq = {}
     for r in results:
         uniq[(r.course, r.play_date, r.tee_time)] = r
     return sorted(uniq.values(), key=lambda x: x.tee_time)
-
 
 def scrape_miclub_public_calendar(
     course_name: str,
