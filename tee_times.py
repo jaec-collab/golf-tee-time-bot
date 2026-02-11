@@ -250,7 +250,7 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
                 # Only use as a display hint if it looks sane
                 # (most tee time slots are max 4; some clubs allow 5 or 6)
                 if best_max <= 6:
-                    slot_players_hint = f"up to {best_max) players"
+                    slot_players_hint = f"up to {best_max} players"
                 # else: don't overwrite the existing hint
 
             # Range text (if present)
