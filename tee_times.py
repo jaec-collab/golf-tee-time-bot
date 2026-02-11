@@ -364,12 +364,40 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
-        html = page.content()
+            # Pull visible text as rendered (more reliable than HTML parsing for MiClub)
+        page_text = page.inner_text("body")
         browser.close()
 
-    # -------- PARSE THE TIMESHEET --------
-    soup = BeautifulSoup(html, "lxml")
-    time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
+    # -------- PARSE THE TIMESHEET (rendered text) --------
+    # Accept both "6:30 AM" and "06:30" (some MiClub views drop AM/PM)
+    time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
+    time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
+
+    found_times: List[str] = []
+
+    for m in time_re_ampm.finditer(page_text):
+        hhmm = ampm_to_24h(m.group(1))
+        if hhmm:
+            found_times.append(hhmm)
+
+    # If none found with AM/PM, fall back to 24h/HH:MM style
+    if not found_times:
+        for m in time_re_24h.finditer(page_text):
+            found_times.append(m.group(0))
+
+    for hhmm in sorted(set(found_times)):
+        if is_before_or_equal(hhmm, latest):
+            results.append(
+                TeeTime(
+                    course=course_name,
+                    play_date=play_date,
+                    tee_time=hhmm,
+                    players_hint=None,
+                    booking_url=final_url,
+                )
+            )
+
+    return sorted(results, key=lambda x: x.tee_time)
 
     unavailable_re = re.compile(r"\b(closed|unavailable|booked|sold\s*out|full|n/?a|no\s*times)\b", re.IGNORECASE)
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|na)", re.IGNORECASE)
