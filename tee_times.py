@@ -370,6 +370,11 @@ def scrape_miclub_public_calendar(
         # -------- EXTRACT TIMES FROM RENDERED TEXT --------
         page_text = page.inner_text("body")
 
+         if DEBUG:
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+            with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
