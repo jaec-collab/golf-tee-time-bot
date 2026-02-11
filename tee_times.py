@@ -306,6 +306,7 @@ def scrape_miclub_public_calendar(
     min_players: int,
     latest: time,
 ) -> List[TeeTime]:
+
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
 
@@ -320,11 +321,11 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
 
-        # Click a likely "price cell" in the grid to open the timesheet
+        # -------- TRY TO CLICK THROUGH TO TIMESHEET --------
         clicked = False
 
         # Strategy 1: click something that looks like a price ($)
-        price_like = page.locator("text=/\\$\\s*\\d+/")
+        price_like = page.locator(r"text=/\$\s*\d+/")
         if price_like.count() > 0:
             try:
                 price_like.first.click(timeout=5_000)
@@ -332,9 +333,8 @@ def scrape_miclub_public_calendar(
             except Exception:
                 clicked = False
 
-        # Strategy 2: click the first obvious button/link in the main table area
+        # Strategy 2: click first obvious link/button inside the table
         if not clicked:
-            # anchors or buttons inside tables are often the booking entry points
             cand = page.locator("table a, table button").first
             try:
                 cand.click(timeout=5_000)
@@ -344,28 +344,21 @@ def scrape_miclub_public_calendar(
 
         if not clicked:
             browser.close()
-            return results
+            return results   # nothing we can do
 
-        # Wait for navigation or modal render
+        # Give the new page/modal time to load
         try:
             page.wait_for_load_state("networkidle", timeout=10_000)
         except Exception:
             pass
         page.wait_for_timeout(1500)
 
-        # If a new page/tab opened, use it
+        # If a new tab opened, switch to it
         if len(page.context.pages) > 1:
             page = page.context.pages[-1]
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=10_000)
-            except Exception:
-                pass
             page.wait_for_timeout(1000)
 
         final_url = page.url
-
-        # Wait for the timesheet-like page to load
-        page.wait_for_timeout(2000)
 
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
@@ -374,56 +367,43 @@ def scrape_miclub_public_calendar(
         html = page.content()
         browser.close()
 
+    # -------- PARSE THE TIMESHEET --------
     soup = BeautifulSoup(html, "lxml")
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
-    # Click a likely "price cell" in the grid to open the timesheet
-        clicked = False
+    for tr in soup.find_all("tr"):
+        tr_text = tr.get_text(" ", strip=True)
 
-        # Strategy 1: click something that looks like a price ($)
-        price_like = page.locator("text=/\\$\\s*\\d+/")
-        if price_like.count() > 0:
-            try:
-                price_like.first.click(timeout=5_000)
-                clicked = True
-            except Exception:
-                clicked = False
+        m = time_re.search(tr_text)
+        if not m:
+            continue
 
-        # Strategy 2: click the first obvious button/link in the main table area
-        if not clicked:
-            # anchors or buttons inside tables are often the booking entry points
-            cand = page.locator("table a, table button").first
-            try:
-                cand.click(timeout=5_000)
-                clicked = True
-            except Exception:
-                clicked = False
+        hhmm = ampm_to_24h(m.group(1))
+        if not hhmm or not is_before_or_equal(hhmm, latest):
+            continue
 
-        if not clicked:
-            browser.close()
-            return results
+        # Only keep rows that *look bookable*
+        has_action_text = re.search(r"\b(book|select|reserve)\b", tr_text, re.IGNORECASE)
+        has_action_element = tr.find("a") or tr.find("button") or tr.find("input")
 
-        # Wait for navigation or modal render
-        try:
-            page.wait_for_load_state("networkidle", timeout=10_000)
-        except Exception:
-            pass
-        page.wait_for_timeout(1500)
+        if not (has_action_text or has_action_element):
+            continue
 
-        # If a new page/tab opened, use it
-        if len(page.context.pages) > 1:
-            page = page.context.pages[-1]
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=10_000)
-            except Exception:
-                pass
-            page.wait_for_timeout(1000)
+        results.append(
+            TeeTime(
+                course=course_name,
+                play_date=play_date,
+                tee_time=hhmm,
+                players_hint=None,
+                booking_url=final_url,
+            )
+        )
 
-        final_url = page.url
-
+    # de-dup and sort
     uniq = {}
     for r in results:
         uniq[(r.course, r.play_date, r.tee_time)] = r
+
     return sorted(uniq.values(), key=lambda x: x.tee_time)
 
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
