@@ -233,6 +233,22 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         if not slot_supports_min:
             continue
 
+        # NEW: look for a players dropdown and enforce max >= min_players
+        player_select = slot_soup.find("select", attrs={"name": re.compile(r"player", re.IGNORECASE)})
+        if not player_select:
+            # fallback: any select whose id/name mentions player(s)
+            player_select = slot_soup.find("select", attrs={"id": re.compile(r"player", re.IGNORECASE)})
+
+        if player_select:
+            option_texts = [opt.get_text(" ", strip=True).lower() for opt in player_select.find_all("option")]
+            nums = []
+            for txt in option_texts:
+                m = re.search(r"\b(\d+)\b", txt)
+                if m:
+                    nums.append(int(m.group(1)))
+        if nums and max(nums) < min_players:
+            slot_supports_min = False
+            
         # Prefer the more specific hint found on the slot page
         players_hint = slot_players_hint
         players_hint = tr_text if "player" in tr_text.lower() else None
