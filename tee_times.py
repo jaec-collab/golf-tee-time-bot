@@ -367,28 +367,22 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
-        # -------- EXTRACT TIMES FROM CLICKABLE LINKS --------
+        # -------- EXTRACT TIMES FROM RENDERED TEXT --------
+        page_text = page.inner_text("body")
+
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-        time_links = page.locator("a:visible")
-        n = min(time_links.count(), 2000)
+        # Gather times we can see
+        for m in time_re_ampm.finditer(page_text):
+            hhmm = ampm_to_24h(m.group(1))
+            if hhmm and is_before_or_equal(hhmm, latest):
+                found.append(hhmm)
 
-        for i in range(n):
-            txt = time_links.nth(i).inner_text().strip()
-            if not txt:
-                continue
-
-            m = time_re_ampm.search(txt)
-            if m:
-                hhmm = ampm_to_24h(m.group(1))
-                if hhmm and is_before_or_equal(hhmm, latest):
-                    found.append(hhmm)
-                continue
-
-            m2 = time_re_24h.search(txt)
-            if m2:
-                hhmm = m2.group(0)
+        # Fallback if the page shows 24h times without AM/PM
+        if not found:
+            for m in time_re_24h.finditer(page_text):
+                hhmm = m.group(0)
                 if is_before_or_equal(hhmm, latest):
                     found.append(hhmm)
 
