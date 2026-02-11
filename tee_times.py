@@ -377,24 +377,49 @@ def scrape_miclub_public_calendar(
     soup = BeautifulSoup(html, "lxml")
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
-    for node in soup.find_all(string=time_re):
-        m = time_re.search(str(node))
-        if not m:
-            continue
+    # Click a likely "price cell" in the grid to open the timesheet
+        clicked = False
 
-        hhmm = ampm_to_24h(m.group(1))
-        if not hhmm or not is_before_or_equal(hhmm, latest):
-            continue
+        # Strategy 1: click something that looks like a price ($)
+        price_like = page.locator("text=/\\$\\s*\\d+/")
+        if price_like.count() > 0:
+            try:
+                price_like.first.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
 
-        results.append(
-            TeeTime(
-                course=course_name,
-                play_date=play_date,
-                tee_time=hhmm,
-                players_hint=None,   # MiClub usually reveals this deeper; we can add later
-                booking_url=final_url,     # good enough for now; later we can capture the final URL
-            )
-        )
+        # Strategy 2: click the first obvious button/link in the main table area
+        if not clicked:
+            # anchors or buttons inside tables are often the booking entry points
+            cand = page.locator("table a, table button").first
+            try:
+                cand.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
+
+        if not clicked:
+            browser.close()
+            return results
+
+        # Wait for navigation or modal render
+        try:
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except Exception:
+            pass
+        page.wait_for_timeout(1500)
+
+        # If a new page/tab opened, use it
+        if len(page.context.pages) > 1:
+            page = page.context.pages[-1]
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=10_000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1000)
+
+        final_url = page.url
 
     uniq = {}
     for r in results:
