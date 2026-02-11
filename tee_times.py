@@ -244,9 +244,14 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
                         best_max = mx
 
             if best_max is not None:
-                slot_players_hint = f"players up to {best_max}"
                 if best_max < min_players:
                     slot_supports_min = False
+
+                # Only use as a display hint if it looks sane
+                # (most tee time slots are max 4; some clubs allow 5 or 6)
+                if best_max <= 6:
+                    slot_players_hint = f"up to {best_max) players"
+                # else: don't overwrite the existing hint
 
             # Range text (if present)
             m_range = re.search(r"\b(\d+)\s*(?:to|-)\s*(\d+)\s*players?\b", page_text)
@@ -271,8 +276,9 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             continue
 
         # Use the hint only if it actually looks like a player hint
-        if slot_players_hint and "player" in slot_players_hint.lower():
+        if slot_players_hint and ("player" in slot_players_hint.lower()) and ("up to 20" not in slot_players_hint.lower()):
             players_hint = slot_players_hint
+        # otherwise: keep the existing players_hint from the matrix row
         else:
             players_hint = None
 
