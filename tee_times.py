@@ -1,12 +1,7 @@
 import os
 import re
-DEBUG = os.environ.get("DEBUG", "false").strip().lower() == "true"
-
-def ensure_debug_dir():
-    if DEBUG:
-        os.makedirs("debug", exist_ok=True)
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import time
 from typing import List, Optional
 
 from bs4 import BeautifulSoup
@@ -14,11 +9,19 @@ from dateutil import parser as dtparser
 from playwright.sync_api import sync_playwright
 
 
+DEBUG = os.environ.get("DEBUG", "false").strip().lower() == "true"
+
+
+def ensure_debug_dir():
+    if DEBUG:
+        os.makedirs("debug", exist_ok=True)
+
+
 @dataclass
 class TeeTime:
     course: str
-    play_date: str
-    tee_time: str
+    play_date: str  # YYYY-MM-DD
+    tee_time: str   # HH:MM (24h)
     players_hint: Optional[str]
     booking_url: str
 
@@ -43,6 +46,13 @@ def is_before_or_equal(hhmm: str, latest: time) -> bool:
 
 
 def looks_like_players_ok(players_hint: Optional[str], min_players: int) -> bool:
+    """
+    Best-effort parsing of strings like:
+      - "1 to 4 players"
+      - "1 or 2 players"
+      - "players up to 4"
+    If unknown, returns True.
+    """
     if not players_hint:
         return True
 
@@ -52,8 +62,7 @@ def looks_like_players_ok(players_hint: Optional[str], min_players: int) -> bool
         return True
 
     if "to" in s and len(nums) >= 2:
-        lo, hi = nums[0], nums[1]
-        return hi >= min_players
+        return nums[1] >= min_players
 
     if "or" in s and len(nums) >= 2:
         return max(nums) >= min_players
@@ -62,27 +71,27 @@ def looks_like_players_ok(players_hint: Optional[str], min_players: int) -> bool
 
 
 def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> List[TeeTime]:
+    """
+    Quick18 search matrix shows 9 Holes + 18 Holes columns.
+    We only accept rows where the 18 Holes column has a clickable Select.
+    Then we open the slot page and try to confirm it supports min_players.
+    """
     yyyymmdd = play_date.replace("-", "")
-    url = f"https://hamersley.quick18.com/teetimes/searchmatrix?teedate={yyyymmdd}"
+    base_url = "https://hamersley.quick18.com"
+    url = f"{base_url}/teetimes/searchmatrix?teedate={yyyymmdd}"
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-
-        # Quick18 sometimes renders a bit after DOMContentLoaded
-        page.wait_for_timeout(1500)
-
+        page.wait_for_timeout(1500)  # allow late render
         html = page.content()
 
-        try:
-            ensure_debug_dir()
-            if DEBUG:
-                page.screenshot(path=f"debug/hamersley_{play_date}.png", full_page=True)
-                with open(f"debug/hamersley_{play_date}.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-        except Exception:
-            pass
+        ensure_debug_dir()
+        if DEBUG:
+            page.screenshot(path=f"debug/hamersley_{play_date}.png", full_page=True)
+            with open(f"debug/hamersley_{play_date}.html", "w", encoding="utf-8") as f:
+                f.write(html)
 
         browser.close()
 
@@ -90,10 +99,8 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
     results: List[TeeTime] = []
 
     def expand_cells(cells) -> List[BeautifulSoup]:
-        """Expand a row's cells by colspan so indexes align with logical columns."""
         expanded = []
         for c in cells:
-            colspan = 1
             try:
                 colspan = int(c.get("colspan", 1))
             except Exception:
@@ -101,10 +108,9 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             expanded.extend([c] * max(colspan, 1))
         return expanded
 
-    # Pick the table that actually looks like the tee time matrix
-    candidate_tables = soup.find_all("table")
+    # Pick the table that actually contains both 9 and 18 holes and select links
     target_table = None
-    for t in candidate_tables:
+    for t in soup.find_all("table"):
         t_text = t.get_text(" ", strip=True).lower()
         if ("18 holes" in t_text) and ("9 holes" in t_text) and ("select" in t_text):
             target_table = t
@@ -113,12 +119,13 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
     if not target_table:
         return results
 
-    # Find the header row that contains "9 Holes" / "18 Holes"
+    # Find a header row containing "18 Holes"
     header_row = None
-    for tr in target_table.find_all("tr")[:6]:
+    for tr in target_table.find_all("tr")[:8]:
         tr_text = tr.get_text(" ", strip=True).lower()
-        if ("18 holes" in tr_text) or ("9 holes" in tr_text):
+        if ("18 holes" in tr_text) or (("18" in tr_text) and ("hole" in tr_text)):
             header_row = tr
+            break
 
     if not header_row:
         return results
@@ -126,26 +133,22 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
     header_cells = expand_cells(header_row.find_all(["th", "td"]))
     headers = [c.get_text(" ", strip=True).lower() for c in header_cells]
 
-    def find_col_idx_contains(needle: str) -> Optional[int]:
-        for i, h in enumerate(headers):
-            if needle in h:
-                return i
-        return None
-
-    col_18 = find_col_idx_contains("18 holes")
+    col_18 = None
+    for i, h in enumerate(headers):
+        if "18 holes" in h:
+            col_18 = i
+            break
     if col_18 is None:
-        # Some variants show "18 Hole" instead
         for i, h in enumerate(headers):
             if ("18" in h) and ("hole" in h):
                 col_18 = i
                 break
-
     if col_18 is None:
         return results
 
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
-    # Data rows: only those that have a Select somewhere
+    # Rows with Select somewhere (cheaper filter)
     for tr in target_table.find_all("tr"):
         tr_text = tr.get_text(" ", strip=True)
         if "select" not in tr_text.lower():
@@ -164,26 +167,19 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             continue
 
         cell_18 = row_cells[col_18]
+
+        # Find a real link in the 18-holes cell
         select_link = cell_18.find("a", string=re.compile(r"select", re.IGNORECASE))
-
-        # Sometimes it's a button/input, not an <a>
-        if not select_link:
-            select_link = cell_18.find("a") or cell_18.find("button") or cell_18.find("input")
-
-        href = None
-        if select_link and select_link.get("href"):
-            href = select_link["href"]
-
-        # If there's no link href, still treat it as not actionable for now
+        href = select_link.get("href") if select_link else None
         if not href:
             continue
 
-        booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
+        booking_url = href if href.startswith("http") else f"{base_url}{href}"
 
-        # Always initialize players_hint so later code can safely reference it
+        # Initialize hint early so later code can reference safely
         players_hint = tr_text if tr_text else None
 
-        # NEW: open the slot page and confirm it supports min_players
+        # --- Validate min_players by opening the slot page ---
         slot_supports_min = True
         slot_players_hint = players_hint
 
@@ -194,84 +190,75 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
                 pg2.goto(booking_url, wait_until="domcontentloaded", timeout=60_000)
                 pg2.wait_for_timeout(1200)
                 slot_html = pg2.content()
+
+                ensure_debug_dir()
+                if DEBUG:
+                    pg2.screenshot(path=f"debug/hamersley_slot_{play_date}_{hhmm.replace(':','')}.png", full_page=True)
+                    with open(f"debug/hamersley_slot_{play_date}_{hhmm.replace(':','')}.html", "w", encoding="utf-8") as f:
+                        f.write(slot_html)
+
                 b2.close()
 
             slot_soup = BeautifulSoup(slot_html, "lxml")
             page_text = slot_soup.get_text(" ", strip=True).lower()
 
-        # NEW: hard reject if the page clearly says only 1 player is allowed/left
-        if min_players >= 2:
-            only_one_patterns = [
-                r"\bonly\s*1\s*player\b",
-                r"\b1\s*player\s*only\b",
-                r"\bonly\s*one\s*player\b",
-                r"\bfor\s*1\s*player\b",
-                r"\bsingle\s*player\b",
-            ]
-        if any(re.search(p, page_text) for p in only_one_patterns):
-            slot_supports_min = False
+            # Hard reject if page clearly indicates only 1 player
+            if min_players >= 2:
+                only_one_patterns = [
+                    r"\bonly\s*1\s*player\b",
+                    r"\b1\s*player\s*only\b",
+                    r"\bonly\s*one\s*player\b",
+                    r"\bfor\s*1\s*player\b",
+                    r"\bsingle\s*player\b",
+                ]
+                if any(re.search(pat, page_text) for pat in only_one_patterns):
+                    slot_supports_min = False
 
-        # ---- NEW: check player dropdown ----
-        selects = slot_soup.find_all("select")
-        best_max = None
+            # Broad dropdown scan: pick the largest option value among selects that look like counts
+            selects = slot_soup.find_all("select")
+            best_max = None
+            for sel in selects:
+                option_texts = [opt.get_text(" ", strip=True).lower() for opt in sel.find_all("option")]
+                nums = []
+                for txt in option_texts:
+                    mm = re.search(r"\b(\d+)\b", txt)
+                    if mm:
+                        nums.append(int(mm.group(1)))
+                # Heuristic: count dropdown usually includes "1"
+                if nums and 1 in nums:
+                    mx = max(nums)
+                    if best_max is None or mx > best_max:
+                        best_max = mx
 
-        for sel in selects:
-        options = [opt.get_text(" ", strip=True).lower()
-                   for opt in sel.find_all("option")]
-        nums = []
-        for txt in options:
-            m = re.search(r"\b(\d+)\b", txt)
-            if m:
-                nums.append(int(m.group(1)))
+            if best_max is not None:
+                slot_players_hint = f"players up to {best_max}"
+                if best_max < min_players:
+                    slot_supports_min = False
 
-        if nums and 1 in nums:
-            mx = max(nums)
-            if best_max is None or mx > best_max:
-                best_max = mx
-
-    if best_max is not None and best_max < min_players:
-        slot_supports_min = False
-    # ---- end dropdown check ----
-
-            # Common patterns: "1 player", "2 players", "1 to 4 players", dropdown options, etc.
-            # If it explicitly mentions only 1 player, reject for min_players >= 2
-            if min_players >= 2 and re.search(r"\b1\s+player\b", page_text) and not re.search(r"\b2\s+player", page_text):
-                slot_supports_min = False
-
-            # If we can find a "to X players" hint, use it
+            # Range text (if present)
             m_range = re.search(r"\b(\d+)\s*(?:to|-)\s*(\d+)\s*players?\b", page_text)
             if m_range:
                 hi = int(m_range.group(2))
-                slot_supports_min = hi >= min_players
                 slot_players_hint = m_range.group(0)
+                if hi < min_players:
+                    slot_supports_min = False
 
-            # Or “Up to X players”
             m_upto = re.search(r"\bup to\s*(\d+)\s*players?\b", page_text)
             if m_upto:
                 hi = int(m_upto.group(1))
-                slot_supports_min = hi >= min_players
                 slot_players_hint = m_upto.group(0)
-
-            # Or explicit list of player counts (e.g., dropdown)
-            # If we see any number >= min_players next to the word player(s), treat as ok.
-            if not m_range and not m_upto:
-                nums = [int(x) for x in re.findall(r"\b(\d+)\s*players?\b", page_text)]
-                if nums:
-                    slot_supports_min = max(nums) >= min_players
-                    slot_players_hint = f"players up to {max(nums)}"
+                if hi < min_players:
+                    slot_supports_min = False
 
         except Exception:
-            # If validation fails due to a transient page issue, keep the slot (conservative)
+            # If the slot page fails to load/transient error, don't block the whole run.
             slot_supports_min = True
 
         if not slot_supports_min:
             continue
-            
-        # Prefer the more specific hint found on the slot page
+
+        # Use the best hint we discovered (avoid misleading "1 player" carried from matrix)
         players_hint = slot_players_hint
-        players_hint = tr_text if "player" in tr_text.lower() else None
-        if not looks_like_players_ok(players_hint, min_players):
-            continue
 
         results.append(
             TeeTime(
@@ -283,10 +270,12 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             )
         )
 
+    # De-dupe by time
     uniq = {}
     for r in results:
         uniq[(r.course, r.play_date, r.tee_time)] = r
     return sorted(uniq.values(), key=lambda x: x.tee_time)
+
 
 def scrape_miclub_public_calendar(
     course_name: str,
@@ -295,7 +284,11 @@ def scrape_miclub_public_calendar(
     min_players: int,
     latest: time,
 ) -> List[TeeTime]:
-
+    """
+    MiClub calendars show fee grid first (no tee times).
+    This function is best-effort and will likely return nothing until
+    we implement the click-through to the timesheet.
+    """
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
 
@@ -303,45 +296,27 @@ def scrape_miclub_public_calendar(
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-
-        for product_label in ["18 Holes", "18 Hole", "All"]:
-            locator = page.get_by_text(product_label, exact=False)
-            if locator.count() > 0:
-                try:
-                    locator.first.click(timeout=3_000)
-                    page.wait_for_timeout(1_000)
-                    break
-                except Exception:
-                    pass
-
+        page.wait_for_timeout(1500)
         html = page.content()
+
         ensure_debug_dir()
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_{play_date}.png", full_page=True)
             with open(f"debug/{safe}_{play_date}.html", "w", encoding="utf-8") as f:
                 f.write(html)
+
         browser.close()
 
     soup = BeautifulSoup(html, "lxml")
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
-    text_nodes = soup.find_all(string=time_re)
-    for node in text_nodes:
+    for node in soup.find_all(string=time_re):
         m = time_re.search(str(node))
         if not m:
             continue
-        t12 = m.group(1)
-        hhmm = ampm_to_24h(t12)
+        hhmm = ampm_to_24h(m.group(1))
         if not hhmm or not is_before_or_equal(hhmm, latest):
-            continue
-
-        players_hint = None
-        parent_text = node.parent.get_text(" ", strip=True) if node.parent else ""
-        if "player" in parent_text.lower():
-            players_hint = parent_text
-
-        if not looks_like_players_ok(players_hint, min_players):
             continue
 
         results.append(
@@ -349,7 +324,7 @@ def scrape_miclub_public_calendar(
                 course=course_name,
                 play_date=play_date,
                 tee_time=hhmm,
-                players_hint=players_hint,
+                players_hint=None,
                 booking_url=url,
             )
         )
@@ -365,8 +340,9 @@ def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int
         return (
             f"# Tee time lookup\n\n"
             f"- Date: **{play_date}**\n"
-            f"- Filter: **{min_players}+ players**, **before {latest_time}**\n\n"
-            f"Nothing matched. Could be full, or a site layout changed.\n"
+            f"- Filter: **{min_players}+ players**, **before {latest_time}**\n"
+            f"- Tip: right-click a link (or Ctrl/Cmd-click) to open it in a new tab.\n\n"
+            f"Nothing matched. Could be full, or one of the booking pages changed.\n"
         )
 
     lines = [
@@ -418,11 +394,10 @@ def main():
 
     all_results: List[TeeTime] = []
 
+    # MiClub (best effort for now)
     for name, template in miclub_courses:
         try:
-            all_results += scrape_miclub_public_calendar(
-                name, template, play_date, min_players, latest
-            )
+            all_results += scrape_miclub_public_calendar(name, template, play_date, min_players, latest)
         except Exception as e:
             all_results.append(
                 TeeTime(
@@ -434,6 +409,7 @@ def main():
                 )
             )
 
+    # Hamersley Quick18
     try:
         all_results += scrape_quick18_hamersley(play_date, min_players, latest)
     except Exception as e:
