@@ -51,7 +51,11 @@ jobs:
       - name: Write summary to job
         if: always()
         run: |
-          cat tee_time_summary.md >> $GITHUB_STEP_SUMMARY
+          if [ -f tee_time_summary.md ]; then
+            cat tee_time_summary.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No summary file was generated (script likely failed)." >> $GITHUB_STEP_SUMMARY
+          fi
           
       - name: Upload debug artifacts
         if: always()
