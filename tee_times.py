@@ -179,7 +179,10 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             continue
 
         booking_url = href if href.startswith("http") else f"https://hamersley.quick18.com{href}"
-        
+
+        # Always initialize players_hint so later code can safely reference it
+        players_hint = tr_text if tr_text else None
+
         # NEW: open the slot page and confirm it supports min_players
         slot_supports_min = True
         slot_players_hint = players_hint
