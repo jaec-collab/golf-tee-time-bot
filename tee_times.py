@@ -306,11 +306,6 @@ def scrape_miclub_public_calendar(
     min_players: int,
     latest: time,
 ) -> List[TeeTime]:
-    """
-    MiClub calendars show fee grid first (no tee times).
-    This function is best-effort and will likely return nothing until
-    we implement the click-through to the timesheet.
-    """
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
 
@@ -319,15 +314,55 @@ def scrape_miclub_public_calendar(
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         page.wait_for_timeout(1500)
-        html = page.content()
 
         ensure_debug_dir()
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            page.screenshot(path=f"debug/{safe}_{play_date}.png", full_page=True)
-            with open(f"debug/{safe}_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(html)
+            page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
 
+        # Click something that looks like "18 holes"
+        clicked = False
+        candidates = [
+            "18 holes",
+            "18 hole",
+            "18-holes",
+            "18-hole",
+        ]
+
+        # MiClub grids vary: try a few strategies.
+        for label in candidates:
+            loc = page.get_by_text(label, exact=False)
+            if loc.count() > 0:
+                try:
+                    loc.first.click(timeout=5_000)
+                    clicked = True
+                    break
+                except Exception:
+                    pass
+
+        # Fallback: click any element that includes both "18" and "hole"
+        if not clicked:
+            loc = page.locator("text=/18.*hole/i")
+            if loc.count() > 0:
+                try:
+                    loc.first.click(timeout=5_000)
+                    clicked = True
+                except Exception:
+                    pass
+
+        # If we didn't manage to click through, return empty (with debug artifacts available)
+        if not clicked:
+            browser.close()
+            return results
+
+        # Wait for the timesheet-like page to load
+        page.wait_for_timeout(2000)
+
+        if DEBUG:
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+            page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
+
+        html = page.content()
         browser.close()
 
     soup = BeautifulSoup(html, "lxml")
@@ -337,6 +372,7 @@ def scrape_miclub_public_calendar(
         m = time_re.search(str(node))
         if not m:
             continue
+
         hhmm = ampm_to_24h(m.group(1))
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
@@ -346,8 +382,8 @@ def scrape_miclub_public_calendar(
                 course=course_name,
                 play_date=play_date,
                 tee_time=hhmm,
-                players_hint=None,
-                booking_url=url,
+                players_hint=None,   # MiClub usually reveals this deeper; we can add later
+                booking_url=url,     # good enough for now; later we can capture the final URL
             )
         )
 
