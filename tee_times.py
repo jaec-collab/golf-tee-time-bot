@@ -392,7 +392,7 @@ def scrape_miclub_public_calendar(
                 play_date=play_date,
                 tee_time=hhmm,
                 players_hint=None,   # MiClub usually reveals this deeper; we can add later
-                booking_url=url,     # good enough for now; later we can capture the final URL
+                booking_url=final_url,     # good enough for now; later we can capture the final URL
             )
         )
 
@@ -400,7 +400,6 @@ def scrape_miclub_public_calendar(
     for r in results:
         uniq[(r.course, r.play_date, r.tee_time)] = r
     return sorted(uniq.values(), key=lambda x: x.tee_time)
-
 
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
     if not all_results:
