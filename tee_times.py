@@ -199,11 +199,23 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             slot_soup = BeautifulSoup(slot_html, "lxml")
             page_text = slot_soup.get_text(" ", strip=True).lower()
 
-                        # ---- NEW: check player dropdown ----
-            player_select = slot_soup.find(
-                "select",
-                attrs={"name": re.compile(r"player", re.IGNORECASE)}
-            )
+        # NEW: hard reject if the page clearly says only 1 player is allowed/left
+        if min_players >= 2:
+            only_one_patterns = [
+                r"\bonly\s*1\s*player\b",
+                r"\b1\s*player\s*only\b",
+                r"\bonly\s*one\s*player\b",
+                r"\bfor\s*1\s*player\b",
+                r"\bsingle\s*player\b",
+            ]
+        if any(re.search(p, page_text) for p in only_one_patterns):
+            slot_supports_min = False
+
+        # ---- NEW: check player dropdown ----
+        player_select = slot_soup.find(
+            "select",
+            attrs={"name": re.compile(r"player", re.IGNORECASE)}
+        )
 
             if not player_select:
                 player_select = slot_soup.find(
