@@ -320,40 +320,49 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
 
-        # Click something that looks like "18 holes"
+        # Click a likely "price cell" in the grid to open the timesheet
         clicked = False
-        candidates = [
-            "18 holes",
-            "18 hole",
-            "18-holes",
-            "18-hole",
-        ]
 
-        # MiClub grids vary: try a few strategies.
-        for label in candidates:
-            loc = page.get_by_text(label, exact=False)
-            if loc.count() > 0:
-                try:
-                    loc.first.click(timeout=5_000)
-                    clicked = True
-                    break
-                except Exception:
-                    pass
+        # Strategy 1: click something that looks like a price ($)
+        price_like = page.locator("text=/\\$\\s*\\d+/")
+        if price_like.count() > 0:
+            try:
+                price_like.first.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
 
-        # Fallback: click any element that includes both "18" and "hole"
+        # Strategy 2: click the first obvious button/link in the main table area
         if not clicked:
-            loc = page.locator("text=/18.*hole/i")
-            if loc.count() > 0:
-                try:
-                    loc.first.click(timeout=5_000)
-                    clicked = True
-                except Exception:
-                    pass
+            # anchors or buttons inside tables are often the booking entry points
+            cand = page.locator("table a, table button").first
+            try:
+                cand.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
 
-        # If we didn't manage to click through, return empty (with debug artifacts available)
         if not clicked:
             browser.close()
             return results
+
+        # Wait for navigation or modal render
+        try:
+            page.wait_for_load_state("networkidle", timeout=10_000)
+        except Exception:
+            pass
+        page.wait_for_timeout(1500)
+
+        # If a new page/tab opened, use it
+        if len(page.context.pages) > 1:
+            page = page.context.pages[-1]
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=10_000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1000)
+
+        final_url = page.url
 
         # Wait for the timesheet-like page to load
         page.wait_for_timeout(2000)
