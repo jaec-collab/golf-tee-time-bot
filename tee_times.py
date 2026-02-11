@@ -309,6 +309,8 @@ def scrape_miclub_public_calendar(
 
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
+    found: List[str] = []
+    final_url = url
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -344,7 +346,7 @@ def scrape_miclub_public_calendar(
 
         if not clicked:
             browser.close()
-            return results   # nothing we can do
+            return results
 
         # Give the new page/modal time to load
         try:
@@ -360,24 +362,18 @@ def scrape_miclub_public_calendar(
 
         final_url = page.url
 
+        ensure_debug_dir()
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
-            # Pull visible text as rendered (more reliable than HTML parsing for MiClub)
-        page_text = page.inner_text("body")
-        browser.close()
-
-       # -------- EXTRACT AVAILABLE TIMES FROM THE DOM (no BeautifulSoup) --------
+        # -------- EXTRACT TIMES FROM CLICKABLE LINKS --------
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-        found: List[str] = []
-
-        # Prefer clickable links (most available times are links)
         time_links = page.locator("a:visible")
-
         n = min(time_links.count(), 2000)
+
         for i in range(n):
             txt = time_links.nth(i).inner_text().strip()
             if not txt:
@@ -391,12 +387,14 @@ def scrape_miclub_public_calendar(
                 continue
 
             m2 = time_re_24h.search(txt)
-            if m2 and is_before_or_equal(m2.group(0), latest):
-                found.append(m2.group(0))
+            if m2:
+                hhmm = m2.group(0)
+                if is_before_or_equal(hhmm, latest):
+                    found.append(hhmm)
 
         browser.close()
 
-    # -------- BUILD RESULTS (outside the with block) --------
+    # -------- BUILD RESULTS (outside Playwright) --------
     for hhmm in sorted(set(found)):
         results.append(
             TeeTime(
