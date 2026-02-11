@@ -346,7 +346,7 @@ def scrape_miclub_public_calendar(
 
         if not clicked:
             browser.close()
-            return results
+            return results   # nothing we can do
 
         # Give the new page/modal time to load
         try:
@@ -367,24 +367,19 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
-        # -------- EXTRACT TIMES FROM RENDERED TEXT --------
+        # -------- EXTRACT TIMES FROM RENDERED TEXT (MOST RELIABLE) --------
         page_text = page.inner_text("body")
-
-         if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
 
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-        # Gather times we can see
+        # First: grab AM/PM times
         for m in time_re_ampm.finditer(page_text):
             hhmm = ampm_to_24h(m.group(1))
             if hhmm and is_before_or_equal(hhmm, latest):
                 found.append(hhmm)
 
-        # Fallback if the page shows 24h times without AM/PM
+        # Fallback: grab 24h times if needed
         if not found:
             for m in time_re_24h.finditer(page_text):
                 hhmm = m.group(0)
