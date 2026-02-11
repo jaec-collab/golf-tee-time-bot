@@ -212,32 +212,26 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             slot_supports_min = False
 
         # ---- NEW: check player dropdown ----
-        player_select = slot_soup.find(
-            "select",
-            attrs={"name": re.compile(r"player", re.IGNORECASE)}
-        )
+        selects = slot_soup.find_all("select")
+        best_max = None
 
-            if not player_select:
-                player_select = slot_soup.find(
-                    "select",
-                    attrs={"id": re.compile(r"player", re.IGNORECASE)}
-                )
+        for sel in selects:
+        options = [opt.get_text(" ", strip=True).lower()
+                   for opt in sel.find_all("option")]
+        nums = []
+        for txt in options:
+            m = re.search(r"\b(\d+)\b", txt)
+            if m:
+                nums.append(int(m.group(1)))
 
-            if player_select:
-                option_texts = [
-                    opt.get_text(" ", strip=True).lower()
-                    for opt in player_select.find_all("option")
-                ]
+        if nums and 1 in nums:
+            mx = max(nums)
+            if best_max is None or mx > best_max:
+                best_max = mx
 
-                nums = []
-                for txt in option_texts:
-                    m = re.search(r"\b(\d+)\b", txt)
-                    if m:
-                        nums.append(int(m.group(1)))
-
-                if nums and max(nums) < min_players:
-                    slot_supports_min = False
-            # ---- end dropdown check ----
+    if best_max is not None and best_max < min_players:
+        slot_supports_min = False
+    # ---- end dropdown check ----
 
             # Common patterns: "1 player", "2 players", "1 to 4 players", dropdown options, etc.
             # If it explicitly mentions only 1 player, reject for min_players >= 2
