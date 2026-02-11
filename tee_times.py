@@ -371,9 +371,11 @@ def scrape_miclub_public_calendar(
     soup = BeautifulSoup(html, "lxml")
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
+    unavailable_re = re.compile(r"\b(closed|unavailable|booked|sold\s*out|full|n/?a|no\s*times)\b", re.IGNORECASE)
+    bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|na)", re.IGNORECASE)
+
     for tr in soup.find_all("tr"):
         tr_text = tr.get_text(" ", strip=True)
-
         m = time_re.search(tr_text)
         if not m:
             continue
@@ -382,11 +384,20 @@ def scrape_miclub_public_calendar(
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        # Only keep rows that *look bookable*
-        has_action_text = re.search(r"\b(book|select|reserve)\b", tr_text, re.IGNORECASE)
-        has_action_element = tr.find("a") or tr.find("button") or tr.find("input")
+        # If the row looks explicitly unavailable, skip it
+        tr_class = " ".join(tr.get("class") or [])
+        if unavailable_re.search(tr_text) or bad_class_re.search(tr_class):
+            continue
 
-        if not (has_action_text or has_action_element):
+        # Also check immediate cells for "unavailable" class/text
+        bad = False
+        for td in tr.find_all(["td", "th"]):
+            td_class = " ".join(td.get("class") or [])
+            td_text = td.get_text(" ", strip=True)
+            if unavailable_re.search(td_text) or bad_class_re.search(td_class):
+                bad = True
+                break
+        if bad:
             continue
 
         results.append(
