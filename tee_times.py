@@ -368,66 +368,36 @@ def scrape_miclub_public_calendar(
         page_text = page.inner_text("body")
         browser.close()
 
-    # -------- PARSE THE TIMESHEET (rendered text) --------
-    # Accept both "6:30 AM" and "06:30" (some MiClub views drop AM/PM)
-    time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
-    time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
+       # -------- EXTRACT AVAILABLE TIMES FROM THE DOM (no BeautifulSoup) --------
+        time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
+        time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-    found_times: List[str] = []
+        found: List[str] = []
 
-    for m in time_re_ampm.finditer(page_text):
-        hhmm = ampm_to_24h(m.group(1))
-        if hhmm:
-            found_times.append(hhmm)
+        # Prefer clickable links (most available times are links)
+        time_links = page.locator("a:visible")
 
-    # If none found with AM/PM, fall back to 24h/HH:MM style
-    if not found_times:
-        for m in time_re_24h.finditer(page_text):
-            found_times.append(m.group(0))
+        n = min(time_links.count(), 2000)
+        for i in range(n):
+            txt = time_links.nth(i).inner_text().strip()
+            if not txt:
+                continue
 
-    for hhmm in sorted(set(found_times)):
-        if is_before_or_equal(hhmm, latest):
-            results.append(
-                TeeTime(
-                    course=course_name,
-                    play_date=play_date,
-                    tee_time=hhmm,
-                    players_hint=None,
-                    booking_url=final_url,
-                )
-            )
+            m = time_re_ampm.search(txt)
+            if m:
+                hhmm = ampm_to_24h(m.group(1))
+                if hhmm and is_before_or_equal(hhmm, latest):
+                    found.append(hhmm)
+                continue
 
-    return sorted(results, key=lambda x: x.tee_time)
+            m2 = time_re_24h.search(txt)
+            if m2 and is_before_or_equal(m2.group(0), latest):
+                found.append(m2.group(0))
 
-    unavailable_re = re.compile(r"\b(closed|unavailable|booked|sold\s*out|full|n/?a|no\s*times)\b", re.IGNORECASE)
-    bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|na)", re.IGNORECASE)
+        browser.close()
 
-    for tr in soup.find_all("tr"):
-        tr_text = tr.get_text(" ", strip=True)
-        m = time_re.search(tr_text)
-        if not m:
-            continue
-
-        hhmm = ampm_to_24h(m.group(1))
-        if not hhmm or not is_before_or_equal(hhmm, latest):
-            continue
-
-        # If the row looks explicitly unavailable, skip it
-        tr_class = " ".join(tr.get("class") or [])
-        if unavailable_re.search(tr_text) or bad_class_re.search(tr_class):
-            continue
-
-        # Also check immediate cells for "unavailable" class/text
-        bad = False
-        for td in tr.find_all(["td", "th"]):
-            td_class = " ".join(td.get("class") or [])
-            td_text = td.get_text(" ", strip=True)
-            if unavailable_re.search(td_text) or bad_class_re.search(td_class):
-                bad = True
-                break
-        if bad:
-            continue
-
+    # -------- BUILD RESULTS (outside the with block) --------
+    for hhmm in sorted(set(found)):
         results.append(
             TeeTime(
                 course=course_name,
@@ -438,12 +408,7 @@ def scrape_miclub_public_calendar(
             )
         )
 
-    # de-dup and sort
-    uniq = {}
-    for r in results:
-        uniq[(r.course, r.play_date, r.tee_time)] = r
-
-    return sorted(uniq.values(), key=lambda x: x.tee_time)
+    return sorted(results, key=lambda x: x.tee_time)
 
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
     if not all_results:
