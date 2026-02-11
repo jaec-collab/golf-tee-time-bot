@@ -217,15 +217,28 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
             # Broad dropdown scan: pick the largest option value among selects that look like counts
             selects = slot_soup.find_all("select")
             best_max = None
+
             for sel in selects:
+                attr_blob = " ".join([
+                    (sel.get("id") or ""),
+                    (sel.get("name") or ""),
+                    " ".join(sel.get("class") or []),
+                ]).lower()
+
                 option_texts = [opt.get_text(" ", strip=True).lower() for opt in sel.find_all("option")]
+                options_blob = " ".join(option_texts)
+
+                # Only treat as player dropdown if "player" appears in select attrs or option text
+                if "player" not in attr_blob and "player" not in options_blob:
+                    continue
+
                 nums = []
                 for txt in option_texts:
                     mm = re.search(r"\b(\d+)\b", txt)
                     if mm:
                         nums.append(int(mm.group(1)))
-                # Heuristic: count dropdown usually includes "1"
-                if nums and 1 in nums:
+
+                if nums:
                     mx = max(nums)
                     if best_max is None or mx > best_max:
                         best_max = mx
@@ -257,8 +270,11 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         if not slot_supports_min:
             continue
 
-        # Use the best hint we discovered (avoid misleading "1 player" carried from matrix)
-        players_hint = slot_players_hint
+        # Use the hint only if it actually looks like a player hint
+        if slot_players_hint and "player" in slot_players_hint.lower():
+            players_hint = slot_players_hint
+        else:
+            players_hint = None
 
         results.append(
             TeeTime(
