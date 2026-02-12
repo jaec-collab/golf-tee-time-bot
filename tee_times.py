@@ -8,14 +8,11 @@ from bs4 import BeautifulSoup
 from dateutil import parser as dtparser
 from playwright.sync_api import sync_playwright
 
-
 DEBUG = os.environ.get("DEBUG", "false").strip().lower() == "true"
-
 
 def ensure_debug_dir():
     if DEBUG:
         os.makedirs("debug", exist_ok=True)
-
 
 @dataclass
 class TeeTime:
@@ -25,11 +22,9 @@ class TeeTime:
     players_hint: Optional[str]
     booking_url: str
 
-
 def parse_hhmm_24(s: str) -> time:
     hh, mm = s.strip().split(":")
     return time(int(hh), int(mm))
-
 
 def ampm_to_24h(t: str) -> Optional[str]:
     t = t.strip()
@@ -39,12 +34,37 @@ def ampm_to_24h(t: str) -> Optional[str]:
     except Exception:
         return None
 
-
 def is_before_or_equal(hhmm: str, latest: time) -> bool:
     t = parse_hhmm_24(hhmm)
     return (t.hour, t.minute) <= (latest.hour, latest.minute)
 
+def get_timesheet_context(page):
+    """
+    Returns (ctx, kind) where ctx is either:
+      - the main page, or
+      - a frame that actually contains the MiClub timesheet.
 
+    This matters because MiClub often renders tee times inside an iframe,
+    which screenshots show but page.content() does NOT.
+    """
+    # 1) If the main page already has the timesheet, use it
+    try:
+        if page.locator(".time-wrapper").count() > 0:
+            return page, "page"
+    except Exception:
+        pass
+
+    # 2) Otherwise search frames (very common on MiClub)
+    for fr in page.frames:
+        try:
+            if fr.locator(".time-wrapper").count() > 0:
+                return fr, "frame"
+        except Exception:
+            continue
+
+    # Fallback: just return the page
+    return page, "page"
+    
 def looks_like_players_ok(players_hint: Optional[str], min_players: int) -> bool:
     """
     Best-effort parsing of strings like:
@@ -68,7 +88,6 @@ def looks_like_players_ok(players_hint: Optional[str], min_players: int) -> bool
         return max(nums) >= min_players
 
     return max(nums) >= min_players
-
 
 def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> List[TeeTime]:
     """
@@ -306,7 +325,13 @@ def scrape_miclub_public_calendar(
     min_players: int,
     latest: time,
 ) -> List[TeeTime]:
-
+    """
+    MiClub public calendar:
+      1) Land on the price grid for the week/day
+      2) Click into a timesheet (often 18 holes)
+      3) Timesheet is frequently rendered inside an iframe (screenshots show it, page.content() may not)
+      4) Extract *bookable* times only (clickable times / time rows with booking action)
+    """
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
     found: List[str] = []
@@ -319,172 +344,189 @@ def scrape_miclub_public_calendar(
         page.wait_for_timeout(1500)
 
         ensure_debug_dir()
+        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+
+        # --- DEBUG: capture the grid page (PNG + HTML) ---
         if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-
-            page.screenshot(
-                path=f"debug/{safe}_grid_{play_date}.png",
-                full_page=True,
-            )
-
-            with open(
-                f"debug/{safe}_grid_{play_date}.html",
-                "w",
-                encoding="utf-8",
-            ) as f:
-                f.write(page.content())
-
-        if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-
-            page.screenshot(
-                path=f"debug/{safe}_times_{play_date}.png",
-                full_page=True,
-            )
-
-            with open(
-                f"debug/{safe}_times_{play_date}.html",
-                "w",
-                encoding="utf-8",
-            ) as f:
+            page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
+            with open(f"debug/{safe}_grid_{play_date}.html", "w", encoding="utf-8") as f:
                 f.write(page.content())
 
         # -------- CLICK THROUGH TO THE DAY TIMESHEET (MiClub) --------
         clicked = False
 
-        # 1) Find the "18 Holes" row (this grid page is mostly a table)
-        row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
-        if row18.count() == 0:
-            # fallback: some themes use div rows instead of <tr>
-            row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
+        # Strategy A: Prefer the "18 Holes" row, click first price cell
+        try:
+            row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
+            if row18.count() == 0:
+                row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
 
-        if row18.count() > 0:
-            # 2) Within that row, click the first PRICE that is not "No Bookings Available"
-            price_cells = row18.first.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/")
-
-            if price_cells.count() > 0:
-                try:
+            if row18.count() > 0:
+                # click a visible price like "$39.00"
+                price_cells = row18.first.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/")
+                if price_cells.count() > 0:
                     price_cells.first.click(timeout=5_000)
                     clicked = True
-                except Exception:
-                    clicked = False
+        except Exception:
+            clicked = False
+
+        # Strategy B: fallback click *any* visible price cell
+        if not clicked:
+            try:
+                any_price = page.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/").first
+                any_price.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
+
+        # Strategy C: fallback click first link/button inside a table
+        if not clicked:
+            try:
+                page.locator("table a, table button, a, button").first.click(timeout=5_000)
+                clicked = True
+            except Exception:
+                clicked = False
 
         if not clicked:
             browser.close()
             return results
 
-        # 3) Wait for the timesheet to appear.
-        # Your earlier debug hint suggests MiClub uses "time-wrapper" for each time row.
+        # Wait for either navigation or in-place update
         try:
-            page.wait_for_selector(".time-wrapper", timeout=10_000)
+            page.wait_for_load_state("networkidle", timeout=10_000)
         except Exception:
-            # if it opened as a navigation instead of an in-page update
+            pass
+        page.wait_for_timeout(1200)
+
+        # If a new tab opened, use it
+        if len(page.context.pages) > 1:
+            page = page.context.pages[-1]
             try:
                 page.wait_for_load_state("domcontentloaded", timeout=10_000)
-                page.wait_for_timeout(1000)
-                page.wait_for_selector(".time-wrapper", timeout=10_000)
             except Exception:
-                browser.close()
-                return results
+                pass
+            page.wait_for_timeout(800)
 
         final_url = page.url
 
-        ensure_debug_dir()
-        if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
+        # Wait for timesheet marker to appear (either on page OR inside a frame)
+        try:
+            page.wait_for_timeout(500)
+            page.wait_for_selector("body", timeout=10_000)
+        except Exception:
+            pass
 
-        # DEBUG PROBE: dump a small sample of elements that contain a tee time
-        if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            # Try to target the actual timesheet grid first: look inside a visible table
-            timeish = page.locator("table:visible").locator("text=/\\d{1,2}:\\d{2}/")
+        # -------- SWITCH TO REAL TIMESHEET (PAGE OR IFRAME) --------
+        ts_ctx, ts_kind = get_timesheet_context(page)
 
-            # Fallback if times aren't in a <table>
-            if timeish.count() == 0:
-                timeish = page.locator("text=/\\d{1,2}:\\d{2}/")
-
-            # Pick something not near the very top (headers/labels tend to appear first)
-            count = timeish.count()
-            if count == 0:
-                probe = None
-            else:
-                probe_idx = 30 if count > 30 else count - 1
-                probe = timeish.nth(probe_idx)
+        # If the timesheet didn't show up quickly, give it a bit more time then retry
+        if ts_ctx is page:
             try:
-                # nearest container is often a td/div representing the slot
-                container = probe.locator("xpath=ancestor-or-self::*[self::td or self::div][1]")
-                sample_html = container.first.inner_html() if container.count() else probe.inner_html()
-                attrs = ""
-                if container.count():
-                    try:
-                        attrs = str(container.first.evaluate("el => ({tag: el.tagName, id: el.id, class: el.className, attrs: Array.from(el.attributes).map(a => [a.name, a.value])})"))
-                    except Exception:
-                        pass
-
-                with open(f"debug/{safe}_probe_{play_date}.txt", "w", encoding="utf-8") as f:
-                    f.write(attrs)
+                page.wait_for_timeout(1200)
+                ts_ctx, ts_kind = get_timesheet_context(page)
             except Exception:
                 pass
 
-        # -------- EXTRACT ONLY *BOOKABLE* TIMES FROM THE TIMESHEET --------
-        found = []
+        # --- DEBUG: capture the timesheet view (PNG + HTML from the correct context) ---
+        if DEBUG:
+            try:
+                page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
+            except Exception:
+                pass
+
+            try:
+                with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
+                    if ts_kind == "frame":
+                        f.write(ts_ctx.content())
+                    else:
+                        f.write(page.content())
+            except Exception:
+                pass
+
+        # -------- EXTRACT AVAILABLE TIMES --------
+        # Important: Only keep times that look *bookable*.
+        # Many MiClub themes show ALL times, but only available ones are links/buttons.
 
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
+        time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-        rows = page.locator(".time-wrapper")
-        row_count = min(rows.count(), 500)  # safety cap
+        # 1) Prefer clickable anchors that include a time
+        try:
+            links = ts_ctx.locator("a:visible")
+            n = min(links.count(), 4000)
+            for i in range(n):
+                txt = links.nth(i).inner_text().strip()
+                if not txt:
+                    continue
 
-        for i in range(row_count):
-            tw = rows.nth(i)
-            txt = tw.inner_text().strip()
-            m = time_re_ampm.search(txt)
-            if not m:
-                continue
+                m = time_re_ampm.search(txt)
+                if m:
+                    hhmm = ampm_to_24h(m.group(1))
+                    if hhmm and is_before_or_equal(hhmm, latest):
+                        found.append(hhmm)
+                    continue
 
-            hhmm = ampm_to_24h(m.group(1))
-            if not hhmm or not is_before_or_equal(hhmm, latest):
-                continue
+                m2 = time_re_24h.search(txt)
+                if m2:
+                    hhmm = m2.group(0)
+                    if is_before_or_equal(hhmm, latest):
+                        found.append(hhmm)
+        except Exception:
+            pass
 
-            # Heuristic: a bookable row usually has a visible action near it (Book/Select/Reserve),
-            # OR the time itself is a clickable link.
-            container = tw.locator("xpath=ancestor-or-self::div[contains(@class,'row')][1]")
-            if container.count() == 0:
-                container = tw.locator("xpath=..")
+        # 2) If that got nothing, fall back to known MiClub time row container
+        if not found:
+            try:
+                rows = ts_ctx.locator(".time-wrapper:visible")
+                rn = min(rows.count(), 4000)
+                for i in range(rn):
+                    row_txt = rows.nth(i).inner_text().strip()
+                    if not row_txt:
+                        continue
 
-            # A) time itself is a link (often only happens when bookable)
-            time_link = tw.locator("a:visible")
-            has_clickable_time = time_link.count() > 0
+                    m = time_re_ampm.search(row_txt)
+                    if m:
+                        hhmm = ampm_to_24h(m.group(1))
+                    else:
+                        m2 = time_re_24h.search(row_txt)
+                        hhmm = m2.group(0) if m2 else None
 
-            # B) action button/link somewhere in the same row container
-            actions = container.locator("a:visible, button:visible, input:visible").filter(
-                has_text=re.compile(r"\b(book|select|reserve)\b", re.IGNORECASE)
+                    if not hhmm or not is_before_or_equal(hhmm, latest):
+                        continue
+
+                    # In many themes, *available* rows have a link/button nearby
+                    row_el = rows.nth(i)
+                    has_action = False
+                    try:
+                        if row_el.locator("a:visible, button:visible, input:visible").count() > 0:
+                            has_action = True
+                    except Exception:
+                        has_action = False
+
+                    if has_action:
+                        found.append(hhmm)
+            except Exception:
+                pass
+
+        browser.close()
+
+    # -------- BUILD RESULTS --------
+    for hhmm in sorted(set(found)):
+        results.append(
+            TeeTime(
+                course=course_name,
+                play_date=play_date,
+                tee_time=hhmm,
+                players_hint=None,
+                booking_url=final_url,
             )
+        )
 
-            # Filter out "disabled" actions
-            is_action_enabled = False
-            for j in range(min(actions.count(), 5)):
-                a = actions.nth(j)
-
-                disabled_attr = a.get_attribute("disabled")
-                aria_disabled = (a.get_attribute("aria-disabled") or "").lower()
-                class_blob = " ".join(a.get_attribute("class").split()) if a.get_attribute("class") else ""
-
-                if disabled_attr is not None:
-                    continue
-                if aria_disabled == "true":
-                    continue
-                if re.search(r"\bdisabled\b|\bunavailable\b|\bbooked\b", class_blob, re.IGNORECASE):
-                    continue
-
-                is_action_enabled = True
-                break
-
-            if has_clickable_time or is_action_enabled:
-                found.append(hhmm)
-
-        # de-dupe and sort
-        found = sorted(set(found))
+    # de-dup + sort
+    uniq = {}
+    for r in results:
+        uniq[(r.course, r.play_date, r.tee_time)] = r
+    return sorted(uniq.values(), key=lambda x: x.tee_time)
 
         browser.close()
 
