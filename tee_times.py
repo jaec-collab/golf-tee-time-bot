@@ -480,7 +480,7 @@ for row in candidates:
     if row_looks_bookable(row):
         found_times.append(hhmm)
 
-return sorted(results, key=lambda x: x.tee_time)
+    return sorted(results, key=lambda x: x.tee_time)
 
 browser.close()
 
