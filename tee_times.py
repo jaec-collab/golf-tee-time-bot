@@ -567,9 +567,20 @@ def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int
     for course, items in by_course.items():
         lines += [f"## {course}", ""]
         for r in items:
-            hint = f" ({r.players_hint})" if r.players_hint else ""
-            lines.append(f"- **{r.tee_time}**{hint}  [open booking page]({r.booking_url})")
-        lines.append("")
+            players_part = ""
+
+            if r.players_hint:
+                s = str(r.players_hint).lower()
+
+                # Extract the highest number mentioned
+                nums = [int(x) for x in re.findall(r"\d+", s)]
+                if nums:
+                    max_players = max(nums)
+                    players_part = f" 1 to {max_players} players"
+
+            lines.append(
+                f"- **{r.tee_time}**{players_part}  [open booking page]({r.booking_url})"
+            )
 
     return "\n".join(lines)
 
