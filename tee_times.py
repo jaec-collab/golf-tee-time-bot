@@ -319,29 +319,25 @@ def scrape_miclub_public_calendar(
         page.wait_for_timeout(1500)
 
         ensure_debug_dir()
-            if DEBUG:
-                safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+        if DEBUG:
+        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
 
-                # screenshot
-                page.screenshot(
-                    path=f"debug/{safe}_times_{play_date}.png",
-                    full_page=True,
-                )
+        page.screenshot(
+            path=f"debug/{safe}_grid_{play_date}.png",
+            full_page=True,
+        )
 
-                # NEW: also save the rendered HTML so we can inspect it
-                with open(
-                    f"debug/{safe}_times_{play_date}.html",
-                    "w",
-                    encoding="utf-8",
-                ) as f:
-                    f.write(page.content())
-            with open(f"debug/{safe}_grid_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
+        with open(
+            f"debug/{safe}_grid_{play_date}.html",
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write(page.content())
 
-         if DEBUG:
-            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
+        if DEBUG:
+        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+        with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
 
         # -------- TRY TO CLICK THROUGH TO TIMESHEET --------
         clicked = False
