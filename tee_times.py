@@ -367,6 +367,19 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
+        # DEBUG PROBE: dump a small sample of elements that contain a tee time
+        if DEBUG:
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+            probe = page.locator("text=/\\b\\d{1,2}:\\d{2}\\b/").first
+            try:
+                # nearest container is often a td/div representing the slot
+                container = probe.locator("xpath=ancestor-or-self::*[self::td or self::div][1]")
+                sample_html = container.first.inner_html() if container.count() else probe.inner_html()
+                with open(f"debug/{safe}_probe_{play_date}.html", "w", encoding="utf-8") as f:
+                    f.write(sample_html)
+            except Exception:
+                pass
+
         # -------- EXTRACT ONLY *CLICKABLE/BOOKABLE* TIMES --------
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
