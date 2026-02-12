@@ -370,13 +370,29 @@ def scrape_miclub_public_calendar(
         # DEBUG PROBE: dump a small sample of elements that contain a tee time
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            probe = page.locator("text=/\\b\\d{1,2}:\\d{2}\\b/").first
+            # try to target the actual timesheet grid area first
+            timeish = page.locator("table:visible text=/\\b\\d{1,2}:\\d{2}\\b/")
+
+            # fallback if times aren't in a <table>
+            if timeish.count() == 0:
+                timeish = page.locator("text=/\\b\\d{1,2}:\\d{2}\\b/")
+
+            # pick something not near the top (headers/labels tend to be early)
+            idx = min(30, max(0, timeish.count() - 1))
+            probe = timeish.nth(idx)
             try:
                 # nearest container is often a td/div representing the slot
                 container = probe.locator("xpath=ancestor-or-self::*[self::td or self::div][1]")
                 sample_html = container.first.inner_html() if container.count() else probe.inner_html()
-                with open(f"debug/{safe}_probe_{play_date}.html", "w", encoding="utf-8") as f:
-                    f.write(sample_html)
+                attrs = ""
+                if container.count():
+                    try:
+                        attrs = str(container.first.evaluate("el => ({tag: el.tagName, id: el.id, class: el.className, attrs: Array.from(el.attributes).map(a => [a.name, a.value])})"))
+                    except Exception:
+                        pass
+
+                with open(f"debug/{safe}_probe_{play_date}.txt", "w", encoding="utf-8") as f:
+                    f.write(attrs)
             except Exception:
                 pass
 
