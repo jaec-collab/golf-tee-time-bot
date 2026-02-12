@@ -367,28 +367,26 @@ def scrape_miclub_public_calendar(
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
             page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
 
-        # -------- EXTRACT *AVAILABLE* TIMES FROM THE DOM --------
+        # -------- EXTRACT ONLY *CLICKABLE/BOOKABLE* TIMES --------
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
         time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-        # “Bad” signals commonly used on MiClub timesheets
-        bad_class_re = re.compile(r"(disabled|unavailable|booked|closed|soldout|full|na)", re.IGNORECASE)
-        bad_text_re = re.compile(r"\b(booked|closed|unavailable|sold\s*out|full|n/?a)\b", re.IGNORECASE)
+        found = []
 
-        # Grab visible elements that contain a time (works for table- or div-based layouts)
+        # We consider a time "bookable" if the time element (or its near container)
+        # has an onclick handler OR is inside a link/button.
         time_nodes = page.locator("text=/\\b\\d{1,2}:\\d{2}\\b/")
 
-        max_nodes = min(time_nodes.count(), 1500)
+        max_nodes = min(time_nodes.count(), 2000)
         for i in range(max_nodes):
             node = time_nodes.nth(i)
 
-            # Use the smallest “unit” of UI we can (node itself + its nearest row/cell parent)
             try:
                 txt = node.inner_text().strip()
             except Exception:
                 continue
 
-            # Parse time from this node
+            # Parse time from this node text
             m = time_re_ampm.search(txt)
             if m:
                 hhmm = ampm_to_24h(m.group(1))
@@ -399,23 +397,41 @@ def scrape_miclub_public_calendar(
             if not hhmm or not is_before_or_equal(hhmm, latest):
                 continue
 
-            # Check disabled-ish attributes/classes on the node
-            cls = (node.get_attribute("class") or "")
-            aria_disabled = (node.get_attribute("aria-disabled") or "").lower()
-            disabled_attr = node.get_attribute("disabled")
-
-            if bad_class_re.search(cls) or aria_disabled == "true" or disabled_attr is not None:
+            # Find the closest "slot container" (td/div/tr) around the time
+            container = node.locator("xpath=ancestor-or-self::*[self::td or self::div or self::tr][1]")
+            if container.count() == 0:
                 continue
 
-            # Also check a nearby container (parent cell/row) for disabled/booked markers
-            container = node.locator("xpath=ancestor-or-self::*[self::td or self::tr or self::div][1]")
-            try:
-                c_cls = (container.get_attribute("class") or "")
-                c_txt = container.inner_text().strip()
-            except Exception:
-                c_cls, c_txt = "", ""
+            # Check for clickability signals
+            # 1) container has onclick
+            onclick = (container.first.get_attribute("onclick") or "").strip()
 
-            if bad_class_re.search(c_cls) or bad_text_re.search(c_txt):
+            # 2) container contains a link/button/input
+            has_action = (
+                container.first.locator("a, button, input").count() > 0
+            )
+
+            # 3) time itself is inside a link/button
+            in_clickable = (
+                node.locator("xpath=ancestor::a[1] | ancestor::button[1]").count() > 0
+            )
+
+            if not (onclick or has_action or in_clickable):
+                continue
+
+            # Extra filter: avoid disabled-looking actions
+            # (common in MiClub to leave disabled buttons/links present)
+            disabled = False
+            try:
+                action = container.first.locator("a, button, input").first
+                cls = (action.get_attribute("class") or "").lower()
+                aria_disabled = (action.get_attribute("aria-disabled") or "").lower()
+                if "disabled" in cls or aria_disabled == "true" or action.get_attribute("disabled") is not None:
+                    disabled = True
+            except Exception:
+                pass
+
+            if disabled:
                 continue
 
             found.append(hhmm)
