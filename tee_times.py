@@ -438,55 +438,51 @@ def scrape_miclub_public_calendar(
     unavailable_re = re.compile(r"\b(unavailable|booked|sold\s*out|full|closed|taken)\b", re.IGNORECASE)
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed|taken)", re.IGNORECASE)
 
-    def element_looks_bookable(node) -> bool:
-        """
-        MiClub (your HTML snippet) shows slots as:
-          Taken / Available / Available / "Click to select row."
-        So: treat it as bookable if 'available' appears at least min_players times
-        within the local time block.
-        """
-        # Use a fairly local container first, then widen slightly
-        containers = [node]
-        cur = node
-        for _ in range(3):
-            if cur and getattr(cur, "parent", None):
-                cur = cur.parent
-                containers.append(cur)
+    def element_looks_bookable(row_node) -> bool:
+    """
+    STRICT: decide using only this single row block.
+    For MiClub Collier-style HTML, the row contains multiple 'Available'/'Taken'
+    representing player slots.
 
-        for hay in containers:
-            if not hay or not hasattr(hay, "get_text"):
-                continue
-
-            blob_text = hay.get_text(" ", strip=True).lower()
-            blob_class = " ".join(hay.get("class") or []).lower() if hasattr(hay, "get") else ""
-
-            # If this container is clearly flagged as unavailable, ignore it
-            if unavailable_re.search(blob_text) or bad_class_re.search(blob_class):
-                # don't instantly return False here because parent containers can include
-                # mixed content; just try the next container
-                continue
-
-            avail_count = blob_text.count("available")
-            if avail_count > 0:
-                return avail_count >= min_players
-
-            # Fallback signals (some themes)
-            if re.search(r"\b(book|select|reserve)\b", blob_text, re.IGNORECASE):
-                return True
-            if hay.find("a", href=True) or hay.find("button") or hay.find("input"):
-                return True
-
+    Rule:
+      - bookable if count("available") >= min_players
+      - NOT bookable if row contains 'taken' only (i.e., 0 available)
+    """
+    if not row_node or not hasattr(row_node, "get_text"):
         return False
+
+    row_text = row_node.get_text(" ", strip=True).lower()
+    row_class = " ".join(row_node.get("class") or []).lower() if hasattr(row_node, "get") else ""
+
+    # Hard negatives
+    if bad_class_re.search(row_class):
+        return False
+    if "no bookings available" in row_text or "no booking available" in row_text:
+        return False
+
+    avail = row_text.count("available")
+    if avail > 0:
+        return avail >= min_players
+
+    # If it says taken/booked etc and has no "available", treat as not bookable
+    if unavailable_re.search(row_text):
+        return False
+
+    # Last-resort fallback (other themes): explicit action words
+    if re.search(r"\b(click to select row|select|book|reserve)\b", row_text, re.IGNORECASE):
+        # only accept this fallback if it's NOT also clearly unavailable
+        return not unavailable_re.search(row_text)
+
+    return False
 
     # Prefer the per-time wrapper if present (your earlier snippet suggests it is)
     candidates = soup.select(".time-wrapper")
+    # If .time-wrapper isn't present, fall back, but still try to keep it "row-ish"
     if not candidates:
-        # fallback: any element that directly contains a time string
         candidates = []
         for t in soup.find_all(string=time_re_ampm):
             if t and getattr(t, "parent", None):
                 candidates.append(t.parent)
-
     found_times: List[str] = []
 
     for node in candidates:
