@@ -335,9 +335,19 @@ def scrape_miclub_public_calendar(
             f.write(page.content())
 
         if DEBUG:
-        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-        with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
-            f.write(page.content())
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+
+            page.screenshot(
+                path=f"debug/{safe}_times_{play_date}.png",
+                full_page=True,
+            )
+
+            with open(
+                f"debug/{safe}_times_{play_date}.html",
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write(page.content())
 
         # -------- TRY TO CLICK THROUGH TO TIMESHEET --------
         clicked = False
