@@ -370,16 +370,20 @@ def scrape_miclub_public_calendar(
         # DEBUG PROBE: dump a small sample of elements that contain a tee time
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-            # try to target the actual timesheet grid area first
-            timeish = page.locator("table:visible text=/\\b\\d{1,2}:\\d{2}\\b/")
+            # Try to target the actual timesheet grid first: look inside a visible table
+            timeish = page.locator("table:visible").locator("text=/\\d{1,2}:\\d{2}/")
 
-            # fallback if times aren't in a <table>
+            # Fallback if times aren't in a <table>
             if timeish.count() == 0:
-                timeish = page.locator("text=/\\b\\d{1,2}:\\d{2}\\b/")
+                timeish = page.locator("text=/\\d{1,2}:\\d{2}/")
 
-            # pick something not near the top (headers/labels tend to be early)
-            idx = min(30, max(0, timeish.count() - 1))
-            probe = timeish.nth(idx)
+            # Pick something not near the very top (headers/labels tend to appear first)
+            count = timeish.count()
+            if count == 0:
+                probe = None
+            else:
+                probe_idx = 30 if count > 30 else count - 1
+                probe = timeish.nth(probe_idx)
             try:
                 # nearest container is often a td/div representing the slot
                 container = probe.locator("xpath=ancestor-or-self::*[self::td or self::div][1]")
