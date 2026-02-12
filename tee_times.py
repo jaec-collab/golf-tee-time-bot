@@ -528,7 +528,7 @@ def scrape_miclub_public_calendar(
         uniq[(r.course, r.play_date, r.tee_time)] = r
     return sorted(uniq.values(), key=lambda x: x.tee_time)
 
-        browser.close()
+    browser.close()
 
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
     if not all_results:
