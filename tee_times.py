@@ -317,7 +317,6 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         uniq[(r.course, r.play_date, r.tee_time)] = r
     return sorted(uniq.values(), key=lambda x: x.tee_time)
 
-
 def scrape_miclub_public_calendar(
     course_name: str,
     calendar_url_template: str,
@@ -354,7 +353,7 @@ def scrape_miclub_public_calendar(
                 row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
 
             if row18.count() > 0:
-                price_cells = row18.first.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/")
+                price_cells = row18.first.locator(r"text=/\$\s*\d+(?:\.\d{2})?/")
                 if price_cells.count() > 0:
                     price_cells.first.click(timeout=5_000)
                     clicked = True
@@ -364,7 +363,7 @@ def scrape_miclub_public_calendar(
         # Strategy B: any visible price
         if not clicked:
             try:
-                page.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/").first.click(timeout=5_000)
+                page.locator(r"text=/\$\s*\d+(?:\.\d{2})?/").first.click(timeout=5_000)
                 clicked = True
             except Exception:
                 clicked = False
@@ -422,7 +421,7 @@ def scrape_miclub_public_calendar(
             except Exception:
                 pass
 
-        # -------- PARSE TIMESHEET HTML (don’t rely on :visible / clickable) --------
+        # -------- GET TIMESHEET HTML --------
         try:
             ts_html = ts_ctx.content() if ts_kind == "frame" else page.content()
         except Exception:
@@ -432,57 +431,78 @@ def scrape_miclub_public_calendar(
 
     soup = BeautifulSoup(ts_html, "lxml")
 
-    candidates = []          # <-- ensure it's always defined
-    found_times: List[str] = []
-
-    # These tend to appear when there are genuinely no times
-    page_text = soup.get_text(" ", strip=True).lower()
-    if "no bookings available" in page_text or "no booking available" in page_text:
-        return results
-
     time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
     time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-    # “unavailable” signals vary by theme, but these are common
-    unavailable_re = re.compile(r"\b(unavailable|booked|sold\s*out|full|closed)\b", re.IGNORECASE)
-    bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed)", re.IGNORECASE)
+    # Common “not bookable” words/classes (add "taken" because MiClub uses it a lot)
+    unavailable_re = re.compile(r"\b(unavailable|booked|sold\s*out|full|closed|taken)\b", re.IGNORECASE)
+    bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed|taken)", re.IGNORECASE)
 
     def element_looks_bookable(node) -> bool:
-        try:
-            candidates = soup.select(".time-wrapper") or []
-        except Exception:
-            candidates = []
+        """
+        MiClub (your HTML snippet) shows slots as:
+          Taken / Available / Available / "Click to select row."
+        So: treat it as bookable if 'available' appears at least min_players times
+        within the local time block.
+        """
+        # Use a fairly local container first, then widen slightly
+        containers = [node]
+        cur = node
+        for _ in range(3):
+            if cur and getattr(cur, "parent", None):
+                cur = cur.parent
+                containers.append(cur)
 
-        if not candidates:
-            try:
-                candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
-                candidates = [c for c in candidates if c]
-            except Exception:
-                candidates = []
+        for hay in containers:
+            if not hay or not hasattr(hay, "get_text"):
+                continue
+
+            blob_text = hay.get_text(" ", strip=True).lower()
+            blob_class = " ".join(hay.get("class") or []).lower() if hasattr(hay, "get") else ""
+
+            # If this container is clearly flagged as unavailable, ignore it
+            if unavailable_re.search(blob_text) or bad_class_re.search(blob_class):
+                # don't instantly return False here because parent containers can include
+                # mixed content; just try the next container
+                continue
+
+            avail_count = blob_text.count("available")
+            if avail_count > 0:
+                return avail_count >= min_players
+
+            # Fallback signals (some themes)
+            if re.search(r"\b(book|select|reserve)\b", blob_text, re.IGNORECASE):
+                return True
+            if hay.find("a", href=True) or hay.find("button") or hay.find("input"):
+                return True
+
+        return False
+
+    # Prefer the per-time wrapper if present (your earlier snippet suggests it is)
+    candidates = soup.select(".time-wrapper")
+    if not candidates:
+        # fallback: any element that directly contains a time string
+        candidates = []
+        for t in soup.find_all(string=time_re_ampm):
+            if t and getattr(t, "parent", None):
+                candidates.append(t.parent)
 
     found_times: List[str] = []
 
     for node in candidates:
-        block_text = node.get_text("\n", strip=True)  # keep line breaks, helps debugging
-        low = block_text.lower()
+        txt = node.get_text(" ", strip=True)
 
-        # Extract the time
-        m = time_re_ampm.search(block_text)
+        m = time_re_ampm.search(txt)
         if m:
             hhmm = ampm_to_24h(m.group(1))
         else:
-            m2 = time_re_24h.search(block_text)
+            m2 = time_re_24h.search(txt)
             hhmm = m2.group(0) if m2 else None
 
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        # ✅ Availability rule for your exact markup:
-        # include if at least one "Available" and no "Taken"
-        has_available = "available" in low
-        has_taken = "taken" in low
-
-        if has_available and not has_taken:
+        if element_looks_bookable(node):
             found_times.append(hhmm)
 
     for hhmm in sorted(set(found_times)):
