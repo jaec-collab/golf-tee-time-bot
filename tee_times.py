@@ -320,19 +320,19 @@ def scrape_miclub_public_calendar(
 
         ensure_debug_dir()
         if DEBUG:
-        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
+            safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
 
-        page.screenshot(
-            path=f"debug/{safe}_grid_{play_date}.png",
-            full_page=True,
-        )
+            page.screenshot(
+                path=f"debug/{safe}_grid_{play_date}.png",
+                full_page=True,
+            )
 
-        with open(
-            f"debug/{safe}_grid_{play_date}.html",
-            "w",
-            encoding="utf-8",
-        ) as f:
-            f.write(page.content())
+            with open(
+                f"debug/{safe}_grid_{play_date}.html",
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write(page.content())
 
         if DEBUG:
             safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
