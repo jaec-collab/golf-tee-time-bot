@@ -434,66 +434,73 @@ def scrape_miclub_public_calendar(
     time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
     time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-    # Common “not bookable” words/classes (add "taken" because MiClub uses it a lot)
-    unavailable_re = re.compile(r"\b(unavailable|booked|sold\s*out|full|closed|taken)\b", re.IGNORECASE)
-    bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed|taken)", re.IGNORECASE)
+    # Word-level matches (avoid substring weirdness)
+    available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
+    taken_word = re.compile(r"\btaken\b", re.IGNORECASE)
 
-    def element_looks_bookable(row_node) -> bool:
+    def extract_time_hhmm(text: str) -> Optional[str]:
+        m = time_re_ampm.search(text)
+        if m:
+            return ampm_to_24h(m.group(1))
+        m2 = time_re_24h.search(text)
+        return m2.group(0) if m2 else None
+
+    def element_looks_bookable(node) -> bool:
         """
-        STRICT: decide using only this single row block.
-        For MiClub Collier-style HTML, the row contains multiple 'Available'/'Taken'
-        representing player slots.
-
-        Rule:
-          - bookable if count("available") >= min_players
-          - NOT bookable if row contains 'taken' only (i.e., 0 available)
+        MiClub rows often contain BOTH Taken and Available.
+        We consider the row bookable if it contains 'available' >= min_players
+        within the *same row block*.
         """
-        if not row_node or not hasattr(row_node, "get_text"):
+        # Start from the node, then walk up until we hit a sensible “row block”
+        # (usually .time-wrapper, but some themes nest it)
+        cur = node
+        best = node
+
+        for _ in range(5):
+            if not cur or not getattr(cur, "parent", None):
+                break
+            cur = cur.parent
+            if hasattr(cur, "get") and cur.get("class"):
+                cls = " ".join(cur.get("class") or []).lower()
+                if "time-wrapper" in cls:
+                    best = cur
+                    break
+            best = cur  # fallback: highest we got to
+
+        blob = best.get_text(" ", strip=True) if hasattr(best, "get_text") else ""
+        if not blob:
             return False
 
-        row_text = row_node.get_text(" ", strip=True).lower()
-        row_class = " ".join(row_node.get("class") or []).lower() if hasattr(row_node, "get") else ""
+        # Critical: count AVAILABLE first, even if TAKEN appears too
+        avail_count = len(available_word.findall(blob))
+        if avail_count >= min_players:
+            return True
 
-        # Hard negatives
-        if bad_class_re.search(row_class):
-            return False
-        if "no bookings available" in row_text or "no booking available" in row_text:
-            return False
-
-        avail = row_text.count("available")
-        if avail > 0:
-            return avail >= min_players
-
-        # If it says taken/booked etc and has no "available", treat as not bookable
-        if unavailable_re.search(row_text):
+        # If no available slots at all, definitely not bookable
+        if avail_count == 0 and taken_word.search(blob):
             return False
 
-        # Last-resort fallback (other themes): explicit action words
-        if re.search(r"\b(click to select row|select|book|reserve)\b", row_text, re.IGNORECASE):
-            # only accept this fallback if it's NOT also clearly unavailable
-            return not unavailable_re.search(row_text)
+        # Some themes don’t show "available" but show booking action words
+        if re.search(r"\b(click to select row|select row|book|reserve)\b", blob, re.IGNORECASE):
+            # Only accept this if it isn't clearly "all taken"
+            return avail_count >= min_players
 
         return False
 
-    # Prefer the per-time wrapper if present (your earlier snippet suggests it is)
+    # Prefer the per-time wrapper
     candidates = soup.select(".time-wrapper")
-    # If .time-wrapper isn't present, fall back, but still try to keep it "row-ish"
     if not candidates:
+        # fallback: parents of any found time strings
         candidates = []
         for t in soup.find_all(string=time_re_ampm):
             if t and getattr(t, "parent", None):
                 candidates.append(t.parent)
+
     found_times: List[str] = []
 
     for node in candidates:
         txt = node.get_text(" ", strip=True)
-
-        m = time_re_ampm.search(txt)
-        if m:
-            hhmm = ampm_to_24h(m.group(1))
-        else:
-            m2 = time_re_24h.search(txt)
-            hhmm = m2.group(0) if m2 else None
+        hhmm = extract_time_hhmm(txt)
 
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
