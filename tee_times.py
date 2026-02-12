@@ -496,7 +496,7 @@ def scrape_miclub_public_calendar(
         hhmm = m2.group(0) if m2 else None
 
     if not hhmm or not is_before_or_equal(hhmm, latest):
-        continue
+    continue
 
     if element_looks_bookable(node):
         found_times.append(hhmm)
