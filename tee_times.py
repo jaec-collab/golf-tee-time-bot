@@ -445,63 +445,35 @@ def scrape_miclub_public_calendar(
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed)", re.IGNORECASE)
 
     def element_looks_bookable(node) -> bool:
-        """
-        Decide if a time block looks bookable by searching nearby for a booking control.
-        We deliberately avoid relying on Playwright visibility.
-        """
-        # check node + a bit of surrounding DOM
-        hay = node
-
-        # walk up a few levels to catch “Book” button next to the time
-        for _ in range(3):
-            if hay and getattr(hay, "parent", None):
-                hay = hay.parent
-
-        blob_text = (hay.get_text(" ", strip=True) if hay else "").lower()
-        blob_class = ""
-        if hay and hasattr(hay, "get"):
-            blob_class = " ".join(hay.get("class") or []).lower()
-
-        if unavailable_re.search(blob_text) or bad_class_re.search(blob_class):
-            return False
-
-        # Look for actual action elements
-        if hay:
-            if hay.find("a", href=True):
-                return True
-            if hay.find("button"):
-                return True
-            if hay.find("input"):
-                return True
-
-        # Some themes don’t use buttons, they use action words
-        if re.search(r"\b(book|select|reserve)\b", blob_text, re.IGNORECASE):
-            return True
-
-        return False
-
-    # MiClub often uses time-wrapper, but we’ll also fall back to “anything with a time”
-    candidates = soup.select(".time-wrapper")
+        candidates = soup.select(".time-wrapper")
     if not candidates:
-        # fallback: find any element containing a time (but we’ll still require “bookable” nearby)
+        # fallback: anything that contains a time
         candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
-        candidates = [c for c in candidates if c]  # drop Nones
+        candidates = [c for c in candidates if c]
 
     found_times: List[str] = []
 
     for node in candidates:
-        txt = node.get_text(" ", strip=True)
-        m = time_re_ampm.search(txt)
+        block_text = node.get_text("\n", strip=True)  # keep line breaks, helps debugging
+        low = block_text.lower()
+
+        # Extract the time
+        m = time_re_ampm.search(block_text)
         if m:
             hhmm = ampm_to_24h(m.group(1))
         else:
-            m2 = time_re_24h.search(txt)
+            m2 = time_re_24h.search(block_text)
             hhmm = m2.group(0) if m2 else None
 
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        if element_looks_bookable(node):
+        # ✅ Availability rule for your exact markup:
+        # include if at least one "Available" and no "Taken"
+        has_available = "available" in low
+        has_taken = "taken" in low
+
+        if has_available and not has_taken:
             found_times.append(hhmm)
 
     for hhmm in sorted(set(found_times)):
