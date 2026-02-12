@@ -482,7 +482,7 @@ for row in candidates:
 
 return sorted(results, key=lambda x: x.tee_time)
 
-    browser.close()
+browser.close()
 
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
     if not all_results:
