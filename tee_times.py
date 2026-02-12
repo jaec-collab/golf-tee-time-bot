@@ -439,41 +439,41 @@ def scrape_miclub_public_calendar(
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed|taken)", re.IGNORECASE)
 
     def element_looks_bookable(row_node) -> bool:
-    """
-    STRICT: decide using only this single row block.
-    For MiClub Collier-style HTML, the row contains multiple 'Available'/'Taken'
-    representing player slots.
+        """
+        STRICT: decide using only this single row block.
+        For MiClub Collier-style HTML, the row contains multiple 'Available'/'Taken'
+        representing player slots.
 
-    Rule:
-      - bookable if count("available") >= min_players
-      - NOT bookable if row contains 'taken' only (i.e., 0 available)
-    """
-    if not row_node or not hasattr(row_node, "get_text"):
+        Rule:
+          - bookable if count("available") >= min_players
+          - NOT bookable if row contains 'taken' only (i.e., 0 available)
+        """
+        if not row_node or not hasattr(row_node, "get_text"):
+            return False
+
+        row_text = row_node.get_text(" ", strip=True).lower()
+        row_class = " ".join(row_node.get("class") or []).lower() if hasattr(row_node, "get") else ""
+
+        # Hard negatives
+        if bad_class_re.search(row_class):
+            return False
+        if "no bookings available" in row_text or "no booking available" in row_text:
+            return False
+
+        avail = row_text.count("available")
+        if avail > 0:
+            return avail >= min_players
+
+        # If it says taken/booked etc and has no "available", treat as not bookable
+        if unavailable_re.search(row_text):
+            return False
+
+        # Last-resort fallback (other themes): explicit action words
+        if re.search(r"\b(click to select row|select|book|reserve)\b", row_text, re.IGNORECASE):
+            # only accept this fallback if it's NOT also clearly unavailable
+            return not unavailable_re.search(row_text)
+
         return False
-
-    row_text = row_node.get_text(" ", strip=True).lower()
-    row_class = " ".join(row_node.get("class") or []).lower() if hasattr(row_node, "get") else ""
-
-    # Hard negatives
-    if bad_class_re.search(row_class):
-        return False
-    if "no bookings available" in row_text or "no booking available" in row_text:
-        return False
-
-    avail = row_text.count("available")
-    if avail > 0:
-        return avail >= min_players
-
-    # If it says taken/booked etc and has no "available", treat as not bookable
-    if unavailable_re.search(row_text):
-        return False
-
-    # Last-resort fallback (other themes): explicit action words
-    if re.search(r"\b(click to select row|select|book|reserve)\b", row_text, re.IGNORECASE):
-        # only accept this fallback if it's NOT also clearly unavailable
-        return not unavailable_re.search(row_text)
-
-    return False
 
     # Prefer the per-time wrapper if present (your earlier snippet suggests it is)
     candidates = soup.select(".time-wrapper")
@@ -488,7 +488,7 @@ def scrape_miclub_public_calendar(
     for node in candidates:
         txt = node.get_text(" ", strip=True)
 
-        m = time_re_ampm.search(txt)
+    m = time_re_ampm.search(txt)
         if m:
             hhmm = ampm_to_24h(m.group(1))
         else:
