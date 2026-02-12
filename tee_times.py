@@ -500,6 +500,11 @@ def scrape_miclub_public_calendar(
 
     for node in candidates:
         txt = node.get_text(" ", strip=True)
+        if DEBUG:
+            avail = len(re.findall(r"\bavailable\b", txt, flags=re.IGNORECASE))
+            taken = len(re.findall(r"\btaken\b", txt, flags=re.IGNORECASE))
+            if avail > 0 or taken > 0:
+                print(f"[{course_name}] {play_date} node preview: avail={avail} taken={taken} :: {txt[:120]}")
         hhmm = extract_time_hhmm(txt)
 
         if not hhmm or not is_before_or_equal(hhmm, latest):
