@@ -331,6 +331,7 @@ def scrape_miclub_public_calendar(
       3) Timesheet is sometimes inside an iframe, so we capture the correct context
       4) Parse the timesheet HTML and keep only rows that have >= min_players "Available"
          AND show a row selection affordance (eg "Click to select row.")
+      5) players_hint = count of "Available" in that time row
     """
 
     url = calendar_url_template.format(date=play_date)
@@ -458,11 +459,9 @@ def scrape_miclub_public_calendar(
 
     time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
     time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
-
     available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
 
     def extract_time_from_row(row) -> Optional[str]:
-        # Most reliable for your HTML: <div class="... time-wrapper"><h3>09:52 am</h3>
         h3 = row.select_one(".time-wrapper h3")
         if h3:
             t = h3.get_text(" ", strip=True)
@@ -470,7 +469,6 @@ def scrape_miclub_public_calendar(
             if m:
                 return ampm_to_24h(m.group(1))
 
-        # Fallback: search anywhere in the row text
         txt = row.get_text(" ", strip=True)
         m = time_re_ampm.search(txt)
         if m:
@@ -479,41 +477,38 @@ def scrape_miclub_public_calendar(
         m2 = time_re_24h.search(txt)
         return m2.group(0) if m2 else None
 
-    def row_looks_bookable(row) -> bool:
+    def row_available_count_if_bookable(row) -> Optional[int]:
         """
-        Your rows look like:
-          Click to select row.
-          ... Taken / Taken / Available / Available ...
-        We treat it as bookable if:
-          - it contains the select affordance
-          - and "Available" count >= min_players within THIS row
+        Return number of "Available" slots for THIS time row, but only if:
+          - it has the row selection affordance
+          - and avail_count >= min_players
         """
         blob = row.get_text(" ", strip=True).lower()
 
         has_select_affordance = ("click to select row" in blob) or ("rowbooktooltip" in str(row).lower())
         if not has_select_affordance:
-            return False
+            return None
 
         avail_count = len(available_word.findall(blob))
-        return avail_count >= min_players
+        if avail_count < min_players:
+            return None
 
-    # Prefer whole time rows (this matches your provided HTML: <div class="row row-time ...">)
+        return avail_count
+
+    # Prefer whole time rows (<div class="row row-time ...">)
     candidates = soup.select("div.row.row-time")
     if not candidates:
-        # Fallback: older themes sometimes still wrap everything differently
+        # fallback: some themes only expose time-wrapper blocks
         candidates = soup.select(".time-wrapper")
-        # If we fell back to .time-wrapper, we'll later walk up to the row container
-        # but at least we won’t return nothing.
 
-    found_times: List[str] = []
+    found: Dict[str, int] = {}
 
     for node in candidates:
-        # If node is a .time-wrapper fallback, walk up to the row container if possible
+        # If node is a .time-wrapper fallback, climb to the row-time container if possible
         row = node
         if hasattr(node, "get") and node.get("class"):
             cls = " ".join(node.get("class") or [])
             if "time-wrapper" in cls:
-                # climb to parent row-time if present
                 parent = getattr(node, "parent", None)
                 while parent is not None and hasattr(parent, "get"):
                     pcls = " ".join(parent.get("class") or [])
@@ -526,16 +521,20 @@ def scrape_miclub_public_calendar(
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        if row_looks_bookable(row):
-            found_times.append(hhmm)
+        avail_count = row_available_count_if_bookable(row)
+        if avail_count is None:
+            continue
 
-    for hhmm in sorted(set(found_times)):
+        # de-dupe by time, keep the highest availability if we see it twice
+        found[hhmm] = max(found.get(hhmm, 0), avail_count)
+
+    for hhmm in sorted(found.keys()):
         results.append(
             TeeTime(
                 course=course_name,
                 play_date=play_date,
                 tee_time=hhmm,
-                players_hint=None,
+                players_hint=found[hhmm],
                 booking_url=final_url,
             )
         )
