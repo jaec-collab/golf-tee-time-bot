@@ -530,20 +530,6 @@ def scrape_miclub_public_calendar(
 
         browser.close()
 
-    # -------- BUILD RESULTS (outside Playwright) --------
-    for hhmm in sorted(set(found)):
-        results.append(
-            TeeTime(
-                course=course_name,
-                play_date=play_date,
-                tee_time=hhmm,
-                players_hint=None,
-                booking_url=final_url,
-            )
-        )
-
-    return sorted(results, key=lambda x: x.tee_time)
-
 def render_markdown(all_results: List[TeeTime], play_date: str, min_players: int, latest_time: str) -> str:
     if not all_results:
         return (
