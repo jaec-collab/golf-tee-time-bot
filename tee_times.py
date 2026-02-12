@@ -489,17 +489,17 @@ def scrape_miclub_public_calendar(
         txt = node.get_text(" ", strip=True)
 
     m = time_re_ampm.search(txt)
-        if m:
-            hhmm = ampm_to_24h(m.group(1))
-        else:
-            m2 = time_re_24h.search(txt)
-            hhmm = m2.group(0) if m2 else None
+    if m:
+        hhmm = ampm_to_24h(m.group(1))
+    else:
+        m2 = time_re_24h.search(txt)
+        hhmm = m2.group(0) if m2 else None
 
-        if not hhmm or not is_before_or_equal(hhmm, latest):
-            continue
+    if not hhmm or not is_before_or_equal(hhmm, latest):
+        continue
 
-        if element_looks_bookable(node):
-            found_times.append(hhmm)
+    if element_looks_bookable(node):
+        found_times.append(hhmm)
 
     for hhmm in sorted(set(found_times)):
         results.append(
