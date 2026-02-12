@@ -445,42 +445,42 @@ def scrape_miclub_public_calendar(
         m2 = time_re_24h.search(text)
         return m2.group(0) if m2 else None
 
-    # Prefer whole time rows, not the inner time-wrapper column
+# Prefer whole time rows, not the inner time-wrapper column
 candidates = soup.select("div.row.row-time")
 
 available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
 
-    def extract_time_from_row(row) -> Optional[str]:
-        h3 = row.select_one(".time-wrapper h3")
-        if h3:
-            t = h3.get_text(" ", strip=True)
-            m = time_re_ampm.search(t)
-            if m:
-                return ampm_to_24h(m.group(1))
-        m = time_re_ampm.search(row.get_text(" ", strip=True))
-        return ampm_to_24h(m.group(1)) if m else None
+def extract_time_from_row(row) -> Optional[str]:
+    h3 = row.select_one(".time-wrapper h3")
+    if h3:
+        t = h3.get_text(" ", strip=True)
+        m = time_re_ampm.search(t)
+        if m:
+            return ampm_to_24h(m.group(1))
+    m = time_re_ampm.search(row.get_text(" ", strip=True))
+    return ampm_to_24h(m.group(1)) if m else None
 
-    def row_looks_bookable(row) -> bool:
-        blob = row.get_text(" ", strip=True).lower()
+def row_looks_bookable(row) -> bool:
+    blob = row.get_text(" ", strip=True).lower()
 
-        if "click to select row" not in blob and "rowbooktooltip" not in str(row).lower():
-            return False
+    if "click to select row" not in blob and "rowbooktooltip" not in str(row).lower():
+        return False
 
-        avail_count = len(available_word.findall(blob))
-        return avail_count >= min_players
+    avail_count = len(available_word.findall(blob))
+    return avail_count >= min_players
 
-    found_times: List[str] = []
+found_times: List[str] = []
 
-    for row in candidates:
-        hhmm = extract_time_from_row(row)
+for row in candidates:
+    hhmm = extract_time_from_row(row)
 
-        if not hhmm or not is_before_or_equal(hhmm, latest):
-            continue
+    if not hhmm or not is_before_or_equal(hhmm, latest):
+        continue
 
-        if row_looks_bookable(row):
-            found_times.append(hhmm)
+    if row_looks_bookable(row):
+        found_times.append(hhmm)
 
-    return sorted(results, key=lambda x: x.tee_time)
+return sorted(results, key=lambda x: x.tee_time)
 
     browser.close()
 
