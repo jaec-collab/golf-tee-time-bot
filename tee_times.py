@@ -448,17 +448,17 @@ def scrape_miclub_public_calendar(
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed)", re.IGNORECASE)
 
     def element_looks_bookable(node) -> bool:
-    try:
-        candidates = soup.select(".time-wrapper") or []
-    except Exception:
-        candidates = []
-
-    if not candidates:
         try:
-            candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
-            candidates = [c for c in candidates if c]
+            candidates = soup.select(".time-wrapper") or []
         except Exception:
             candidates = []
+
+        if not candidates:
+            try:
+                candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
+                candidates = [c for c in candidates if c]
+            except Exception:
+                candidates = []
 
     found_times: List[str] = []
 
