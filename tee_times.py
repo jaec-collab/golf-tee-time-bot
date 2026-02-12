@@ -427,91 +427,64 @@ def scrape_miclub_public_calendar(
             except Exception:
                 pass
 
-        # -------- EXTRACT *AVAILABLE* TIMES (MiClub responsive rows) --------
+        # -------- EXTRACT ONLY *BOOKABLE* TIMES FROM THE TIMESHEET --------
         found = []
 
         time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
-        time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b", re.IGNORECASE)
 
-        bad_class_re = re.compile(r"(disabled|unavailable|booked|closed|soldout|full|na)", re.IGNORECASE)
-        bad_text_re = re.compile(r"\b(booked|closed|unavailable|sold\s*out|full|n/?a)\b", re.IGNORECASE)
-
-        # Each row has a time label in ".time-wrapper"
-        time_wrappers = page.locator(".time-wrapper")
-        row_count = min(time_wrappers.count(), 400)  # sanity cap
+        rows = page.locator(".time-wrapper")
+        row_count = min(rows.count(), 500)  # safety cap
 
         for i in range(row_count):
-            tw = time_wrappers.nth(i)
-
-            try:
-                tw_text = tw.inner_text().strip()
-            except Exception:
+            tw = rows.nth(i)
+            txt = tw.inner_text().strip()
+            m = time_re_ampm.search(txt)
+            if not m:
                 continue
 
-            # Extract time from the time-wrapper text
-            m = time_re_ampm.search(tw_text)
-            if m:
-                hhmm = ampm_to_24h(m.group(1))
-            else:
-                m2 = time_re_24h.search(tw_text)
-                hhmm = m2.group(0) if m2 else None
-
+            hhmm = ampm_to_24h(m.group(1))
             if not hhmm or not is_before_or_equal(hhmm, latest):
                 continue
 
-            # Find the "row container" for this time label
-            # Usually: a parent div that represents the whole line for that time
-            row = tw.locator("xpath=ancestor::div[contains(@class,'row')][1]")
-            if row.count() == 0:
-                row = tw.locator("xpath=ancestor::div[1]")
+            # Heuristic: a bookable row usually has a visible action near it (Book/Select/Reserve),
+            # OR the time itself is a clickable link.
+            container = tw.locator("xpath=ancestor-or-self::div[contains(@class,'row')][1]")
+            if container.count() == 0:
+                container = tw.locator("xpath=..")
 
-            # Availability signals inside the same row:
-            # - link/button/input present
-            # - or any element with onclick
-            # and NOT disabled/unavailable
-            try:
-                row_text = row.first.inner_text().strip()
-            except Exception:
-                row_text = ""
+            # A) time itself is a link (often only happens when bookable)
+            time_link = tw.locator("a:visible")
+            has_clickable_time = time_link.count() > 0
 
-            row_class = (row.first.get_attribute("class") or "") if row.count() else ""
+            # B) action button/link somewhere in the same row container
+            actions = container.locator("a:visible, button:visible, input:visible").filter(
+                has_text=re.compile(r"\b(book|select|reserve)\b", re.IGNORECASE)
+            )
 
-            # quick reject obvious unavailable rows
-            if bad_class_re.search(row_class) or bad_text_re.search(row_text):
-                continue
-
-            actions = row.first.locator("a:visible, button:visible, input:visible, [onclick]:visible")
-            action_count = min(actions.count(), 50)
-
-            has_bookable_action = False
-            for j in range(action_count):
+            # Filter out "disabled" actions
+            is_action_enabled = False
+            for j in range(min(actions.count(), 5)):
                 a = actions.nth(j)
-                cls = (a.get_attribute("class") or "")
-                aria_disabled = (a.get_attribute("aria-disabled") or "").lower()
-                disabled_attr = a.get_attribute("disabled")
 
-                # if action looks disabled, ignore it
-                if bad_class_re.search(cls) or aria_disabled == "true" or disabled_attr is not None:
+                disabled_attr = a.get_attribute("disabled")
+                aria_disabled = (a.get_attribute("aria-disabled") or "").lower()
+                class_blob = " ".join(a.get_attribute("class").split()) if a.get_attribute("class") else ""
+
+                if disabled_attr is not None:
+                    continue
+                if aria_disabled == "true":
+                    continue
+                if re.search(r"\bdisabled\b|\bunavailable\b|\bbooked\b", class_blob, re.IGNORECASE):
                     continue
 
-                # if it's a link, require href or onclick
-                href = (a.get_attribute("href") or "").strip()
-                onclick = (a.get_attribute("onclick") or "").strip()
+                is_action_enabled = True
+                break
 
-                # action text can help, but don't require it (some are icons)
-                try:
-                    a_text = a.inner_text().strip().lower()
-                except Exception:
-                    a_text = ""
+            if has_clickable_time or is_action_enabled:
+                found.append(hhmm)
 
-                if href or onclick or re.search(r"\b(book|select|reserve)\b", a_text):
-                    has_bookable_action = True
-                    break
-
-            if not has_bookable_action:
-                continue
-
-            found.append(hhmm)
+        # de-dupe and sort
+        found = sorted(set(found))
 
         browser.close()
 
