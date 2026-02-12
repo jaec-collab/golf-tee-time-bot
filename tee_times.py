@@ -506,6 +506,9 @@ def scrape_miclub_public_calendar(
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
+        if DEBUG and hhmm in {"06:00", "06:08", "06:16", "06:24"}:
+            print(course_name, hhmm, "avail=", len(re.findall(r"\bavailable\b", txt.lower())))
+        
         if element_looks_bookable(node):
             found_times.append(hhmm)
 
