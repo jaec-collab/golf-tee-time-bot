@@ -324,9 +324,22 @@ def scrape_miclub_public_calendar(
     min_players: int,
     latest: time,
 ) -> List[TeeTime]:
+    """
+    MiClub public calendar (2-step):
+      1) Land on the price grid for the day/week
+      2) Click into a timesheet (often via an 18 Holes price cell)
+      3) Timesheet is sometimes inside an iframe, so we capture the correct context
+      4) Parse the timesheet HTML and keep only rows that have >= min_players "Available"
+         AND show a row selection affordance (eg "Click to select row.")
+    """
+
     url = calendar_url_template.format(date=play_date)
     results: List[TeeTime] = []
     final_url = url
+    ts_html = ""
+
+    ensure_debug_dir()
+    safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -334,19 +347,22 @@ def scrape_miclub_public_calendar(
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         page.wait_for_timeout(1500)
 
-        ensure_debug_dir()
-        safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
-
         # --- DEBUG: grid page ---
         if DEBUG:
-            page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
-            with open(f"debug/{safe}_grid_{play_date}.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
+            try:
+                page.screenshot(path=f"debug/{safe}_grid_{play_date}.png", full_page=True)
+            except Exception:
+                pass
+            try:
+                with open(f"debug/{safe}_grid_{play_date}.html", "w", encoding="utf-8") as f:
+                    f.write(page.content())
+            except Exception:
+                pass
 
-        # -------- CLICK THROUGH TO THE DAY TIMESHEET (MiClub) --------
+        # -------- CLICK THROUGH TO THE DAY TIMESHEET --------
         clicked = False
 
-        # Strategy A: "18 Holes" row -> click a price
+        # Strategy A: 18 Holes row -> click a price
         try:
             row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
             if row18.count() == 0:
@@ -360,7 +376,7 @@ def scrape_miclub_public_calendar(
         except Exception:
             clicked = False
 
-        # Strategy B: any visible price
+        # Strategy B: click any visible price
         if not clicked:
             try:
                 page.locator(r"text=/\$\s*\d+(?:\.\d{2})?/").first.click(timeout=5_000)
@@ -368,7 +384,7 @@ def scrape_miclub_public_calendar(
             except Exception:
                 clicked = False
 
-        # Strategy C: any obvious link/button
+        # Strategy C: click any obvious link/button
         if not clicked:
             try:
                 page.locator("table a, table button, a, button").first.click(timeout=5_000)
@@ -380,13 +396,14 @@ def scrape_miclub_public_calendar(
             browser.close()
             return results
 
-        # wait for navigation or in-place update
+        # Wait for navigation or in-place update
         try:
             page.wait_for_load_state("networkidle", timeout=10_000)
         except Exception:
             pass
         page.wait_for_timeout(1200)
 
+        # If a new tab opened, use it
         if len(page.context.pages) > 1:
             page = page.context.pages[-1]
             try:
@@ -397,21 +414,20 @@ def scrape_miclub_public_calendar(
 
         final_url = page.url
 
-        # -------- SWITCH TO REAL TIMESHEET (PAGE OR IFRAME) --------
+        # Get the correct timesheet context (page vs iframe)
         ts_ctx, ts_kind = get_timesheet_context(page)
 
-        # give it another beat if the first pass didn’t find the right context
+        # Give it another beat if we didn't find it yet
         if ts_ctx is page:
             page.wait_for_timeout(1200)
             ts_ctx, ts_kind = get_timesheet_context(page)
 
-        # DEBUG: screenshot + correct HTML (page vs frame)
+        # --- DEBUG: timesheet screenshot + HTML (correct context) ---
         if DEBUG:
             try:
                 page.screenshot(path=f"debug/{safe}_times_{play_date}.png", full_page=True)
             except Exception:
                 pass
-
             try:
                 with open(f"debug/{safe}_times_{play_date}.html", "w", encoding="utf-8") as f:
                     if ts_kind == "frame":
@@ -421,7 +437,7 @@ def scrape_miclub_public_calendar(
             except Exception:
                 pass
 
-        # -------- GET TIMESHEET HTML --------
+        # Capture timesheet HTML for parsing (do this BEFORE closing browser)
         try:
             ts_html = ts_ctx.content() if ts_kind == "frame" else page.content()
         except Exception:
@@ -429,56 +445,100 @@ def scrape_miclub_public_calendar(
 
         browser.close()
 
+    # -------- PARSE TIMESHEET HTML --------
+    if not ts_html:
+        return results
+
     soup = BeautifulSoup(ts_html, "lxml")
+
+    # Quick early exit if page genuinely says no bookings
+    page_text = soup.get_text(" ", strip=True).lower()
+    if "no bookings available" in page_text or "no booking available" in page_text:
+        return results
 
     time_re_ampm = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
     time_re_24h = re.compile(r"\b([01]?\d|2[0-3]):[0-5]\d\b")
 
-    # Word-level matches (avoid substring weirdness)
     available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
-    taken_word = re.compile(r"\btaken\b", re.IGNORECASE)
 
-    def extract_time_hhmm(text: str) -> Optional[str]:
-        m = time_re_ampm.search(text)
+    def extract_time_from_row(row) -> Optional[str]:
+        # Most reliable for your HTML: <div class="... time-wrapper"><h3>09:52 am</h3>
+        h3 = row.select_one(".time-wrapper h3")
+        if h3:
+            t = h3.get_text(" ", strip=True)
+            m = time_re_ampm.search(t)
+            if m:
+                return ampm_to_24h(m.group(1))
+
+        # Fallback: search anywhere in the row text
+        txt = row.get_text(" ", strip=True)
+        m = time_re_ampm.search(txt)
         if m:
             return ampm_to_24h(m.group(1))
-        m2 = time_re_24h.search(text)
+
+        m2 = time_re_24h.search(txt)
         return m2.group(0) if m2 else None
 
-# Prefer whole time rows, not the inner time-wrapper column
-candidates = soup.select("div.row.row-time")
+    def row_looks_bookable(row) -> bool:
+        """
+        Your rows look like:
+          Click to select row.
+          ... Taken / Taken / Available / Available ...
+        We treat it as bookable if:
+          - it contains the select affordance
+          - and "Available" count >= min_players within THIS row
+        """
+        blob = row.get_text(" ", strip=True).lower()
 
-available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
+        has_select_affordance = ("click to select row" in blob) or ("rowbooktooltip" in str(row).lower())
+        if not has_select_affordance:
+            return False
 
-def extract_time_from_row(row) -> Optional[str]:
-    h3 = row.select_one(".time-wrapper h3")
-    if h3:
-        t = h3.get_text(" ", strip=True)
-        m = time_re_ampm.search(t)
-        if m:
-            return ampm_to_24h(m.group(1))
-    m = time_re_ampm.search(row.get_text(" ", strip=True))
-    return ampm_to_24h(m.group(1)) if m else None
+        avail_count = len(available_word.findall(blob))
+        return avail_count >= min_players
 
-def row_looks_bookable(row) -> bool:
-    blob = row.get_text(" ", strip=True).lower()
+    # Prefer whole time rows (this matches your provided HTML: <div class="row row-time ...">)
+    candidates = soup.select("div.row.row-time")
+    if not candidates:
+        # Fallback: older themes sometimes still wrap everything differently
+        candidates = soup.select(".time-wrapper")
+        # If we fell back to .time-wrapper, we'll later walk up to the row container
+        # but at least we won’t return nothing.
 
-    if "click to select row" not in blob and "rowbooktooltip" not in str(row).lower():
-        return False
+    found_times: List[str] = []
 
-    avail_count = len(available_word.findall(blob))
-    return avail_count >= min_players
+    for node in candidates:
+        # If node is a .time-wrapper fallback, walk up to the row container if possible
+        row = node
+        if hasattr(node, "get") and node.get("class"):
+            cls = " ".join(node.get("class") or [])
+            if "time-wrapper" in cls:
+                # climb to parent row-time if present
+                parent = getattr(node, "parent", None)
+                while parent is not None and hasattr(parent, "get"):
+                    pcls = " ".join(parent.get("class") or [])
+                    if "row-time" in pcls:
+                        row = parent
+                        break
+                    parent = getattr(parent, "parent", None)
 
-found_times: List[str] = []
+        hhmm = extract_time_from_row(row)
+        if not hhmm or not is_before_or_equal(hhmm, latest):
+            continue
 
-for row in candidates:
-    hhmm = extract_time_from_row(row)
+        if row_looks_bookable(row):
+            found_times.append(hhmm)
 
-    if not hhmm or not is_before_or_equal(hhmm, latest):
-        continue
-
-    if row_looks_bookable(row):
-        found_times.append(hhmm)
+    for hhmm in sorted(set(found_times)):
+        results.append(
+            TeeTime(
+                course=course_name,
+                play_date=play_date,
+                tee_time=hhmm,
+                players_hint=None,
+                booking_url=final_url,
+            )
+        )
 
     return sorted(results, key=lambda x: x.tee_time)
 
