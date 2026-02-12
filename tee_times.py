@@ -446,46 +446,47 @@ def scrape_miclub_public_calendar(
         return m2.group(0) if m2 else None
 
     def element_looks_bookable(node) -> bool:
-        """
-        MiClub rows often contain BOTH Taken and Available.
-        We consider the row bookable if it contains 'available' >= min_players
-        within the *same row block*.
-        """
-        # Start from the node, then walk up until we hit a sensible “row block”
-        # (usually .time-wrapper, but some themes nest it)
-        cur = node
-        best = node
-
-        for _ in range(5):
-            if not cur or not getattr(cur, "parent", None):
+    """
+    Return True only if THIS time block has >= min_players 'Available'
+    and also contains a selection affordance.
+    """
+    # 1) Find the nearest .time-wrapper ancestor (or treat node as the wrapper)
+    wrapper = None
+    cur = node
+    for _ in range(10):
+        if not cur:
+            break
+        if hasattr(cur, "get") and cur.get("class"):
+            cls = " ".join(cur.get("class") or []).lower()
+            if "time-wrapper" in cls:
+                wrapper = cur
                 break
-            cur = cur.parent
-            if hasattr(cur, "get") and cur.get("class"):
-                cls = " ".join(cur.get("class") or []).lower()
-                if "time-wrapper" in cls:
-                    best = cur
-                    break
-            best = cur  # fallback: highest we got to
+        cur = getattr(cur, "parent", None)
 
-        blob = best.get_text(" ", strip=True) if hasattr(best, "get_text") else ""
-        if not blob:
-            return False
+    if wrapper is None:
+        wrapper = node  # fallback
 
-        # Critical: count AVAILABLE first, even if TAKEN appears too
-        avail_count = len(available_word.findall(blob))
-        if avail_count >= min_players:
-            return True
-
-        # If no available slots at all, definitely not bookable
-        if avail_count == 0 and taken_word.search(blob):
-            return False
-
-        # Some themes don’t show "available" but show booking action words
-        if re.search(r"\b(click to select row|select row|book|reserve)\b", blob, re.IGNORECASE):
-            # Only accept this if it isn't clearly "all taken"
-            return avail_count >= min_players
-
+    blob = wrapper.get_text(" ", strip=True)
+    if not blob:
         return False
+
+    blob_l = blob.lower()
+
+    # 2) If the row explicitly says Taken and has *no* Available, it's not bookable
+    avail_count = len(re.findall(r"\bavailable\b", blob_l))
+    if avail_count < min_players:
+        return False
+
+    # 3) Require a selection signal that is usually present only for bookable rows
+    # (your HTML shows "Click to select row.")
+    if re.search(r"\b(click to select row|select row|book|reserve|select)\b", blob_l):
+        return True
+
+    # Some themes use actual controls
+    if wrapper.find("a", href=True) or wrapper.find("button") or wrapper.find("input"):
+        return True
+
+    return False
 
     # Prefer the per-time wrapper
     candidates = soup.select(".time-wrapper")
