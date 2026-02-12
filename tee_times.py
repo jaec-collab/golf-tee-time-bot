@@ -349,42 +349,43 @@ def scrape_miclub_public_calendar(
             ) as f:
                 f.write(page.content())
 
-        # -------- TRY TO CLICK THROUGH TO TIMESHEET --------
+        # -------- CLICK THROUGH TO THE DAY TIMESHEET (MiClub) --------
         clicked = False
 
-        # Strategy 1: click something that looks like a price ($)
-        price_like = page.locator(r"text=/\$\s*\d+/")
-        if price_like.count() > 0:
-            try:
-                price_like.first.click(timeout=5_000)
-                clicked = True
-            except Exception:
-                clicked = False
+        # 1) Find the "18 Holes" row (this grid page is mostly a table)
+        row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
+        if row18.count() == 0:
+            # fallback: some themes use div rows instead of <tr>
+            row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
 
-        # Strategy 2: click first obvious link/button inside the table
-        if not clicked:
-            cand = page.locator("table a, table button").first
-            try:
-                cand.click(timeout=5_000)
-                clicked = True
-            except Exception:
-                clicked = False
+        if row18.count() > 0:
+            # 2) Within that row, click the first PRICE that is not "No Bookings Available"
+            price_cells = row18.first.locator("text=/\\$\\s*\\d+(?:\\.\\d{2})?/")
+
+            if price_cells.count() > 0:
+                try:
+                    price_cells.first.click(timeout=5_000)
+                    clicked = True
+                except Exception:
+                    clicked = False
 
         if not clicked:
             browser.close()
-            return results   # nothing we can do
+            return results
 
-        # Give the new page/modal time to load
+        # 3) Wait for the timesheet to appear.
+        # Your earlier debug hint suggests MiClub uses "time-wrapper" for each time row.
         try:
-            page.wait_for_load_state("networkidle", timeout=10_000)
+            page.wait_for_selector(".time-wrapper", timeout=10_000)
         except Exception:
-            pass
-        page.wait_for_timeout(1500)
-
-        # If a new tab opened, switch to it
-        if len(page.context.pages) > 1:
-            page = page.context.pages[-1]
-            page.wait_for_timeout(1000)
+            # if it opened as a navigation instead of an in-page update
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=10_000)
+                page.wait_for_timeout(1000)
+                page.wait_for_selector(".time-wrapper", timeout=10_000)
+            except Exception:
+                browser.close()
+                return results
 
         final_url = page.url
 
