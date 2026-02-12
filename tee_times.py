@@ -432,6 +432,9 @@ def scrape_miclub_public_calendar(
 
     soup = BeautifulSoup(ts_html, "lxml")
 
+    candidates = []          # <-- ensure it's always defined
+    found_times: List[str] = []
+
     # These tend to appear when there are genuinely no times
     page_text = soup.get_text(" ", strip=True).lower()
     if "no bookings available" in page_text or "no booking available" in page_text:
@@ -445,11 +448,17 @@ def scrape_miclub_public_calendar(
     bad_class_re = re.compile(r"(unavailable|disabled|booked|soldout|full|closed)", re.IGNORECASE)
 
     def element_looks_bookable(node) -> bool:
-        candidates = soup.select(".time-wrapper")
+    try:
+        candidates = soup.select(".time-wrapper") or []
+    except Exception:
+        candidates = []
+
     if not candidates:
-        # fallback: anything that contains a time
-        candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
-        candidates = [c for c in candidates if c]
+        try:
+            candidates = [t.parent for t in soup.find_all(string=time_re_ampm)]
+            candidates = [c for c in candidates if c]
+        except Exception:
+            candidates = []
 
     found_times: List[str] = []
 
