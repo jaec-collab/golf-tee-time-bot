@@ -445,83 +445,40 @@ def scrape_miclub_public_calendar(
         m2 = time_re_24h.search(text)
         return m2.group(0) if m2 else None
 
-    def element_looks_bookable(node) -> bool:
-        """
-        Return True only if THIS time block has >= min_players 'Available'
-        and also contains a selection affordance.
-        """
-        # 1) Find the nearest .time-wrapper ancestor (or treat node as the wrapper)
-        wrapper = None
-        cur = node
-        for _ in range(10):
-            if not cur:
-                break
-            if hasattr(cur, "get") and cur.get("class"):
-                cls = " ".join(cur.get("class") or []).lower()
-                if "time-wrapper" in cls:
-                    wrapper = cur
-                    break
-            cur = getattr(cur, "parent", None)
+    # Prefer whole time rows, not the inner time-wrapper column
+candidates = soup.select("div.row.row-time")
 
-        if wrapper is None:
-            wrapper = node  # fallback
+available_word = re.compile(r"\bavailable\b", re.IGNORECASE)
 
-        blob = wrapper.get_text(" ", strip=True)
-        if not blob:
+    def extract_time_from_row(row) -> Optional[str]:
+        h3 = row.select_one(".time-wrapper h3")
+        if h3:
+            t = h3.get_text(" ", strip=True)
+            m = time_re_ampm.search(t)
+            if m:
+                return ampm_to_24h(m.group(1))
+        m = time_re_ampm.search(row.get_text(" ", strip=True))
+        return ampm_to_24h(m.group(1)) if m else None
+
+    def row_looks_bookable(row) -> bool:
+        blob = row.get_text(" ", strip=True).lower()
+
+        if "click to select row" not in blob and "rowbooktooltip" not in str(row).lower():
             return False
 
-        blob_l = blob.lower()
-
-        # 2) If the row explicitly says Taken and has *no* Available, it's not bookable
-        avail_count = len(re.findall(r"\bavailable\b", blob_l))
-        if avail_count < min_players:
-            return False
-
-        # 3) Require a selection signal that is usually present only for bookable rows
-        # (your HTML shows "Click to select row.")
-        if re.search(r"\b(click to select row|select row|book|reserve|select)\b", blob_l):
-            return True
-
-        # Some themes use actual controls
-        if wrapper.find("a", href=True) or wrapper.find("button") or wrapper.find("input"):
-            return True
-
-        return False
-
-    # Prefer the per-time wrapper
-    candidates = soup.select(".time-wrapper")
-    if not candidates:
-        # fallback: parents of any found time strings
-        candidates = []
-        for t in soup.find_all(string=time_re_ampm):
-            if t and getattr(t, "parent", None):
-                candidates.append(t.parent)
+        avail_count = len(available_word.findall(blob))
+        return avail_count >= min_players
 
     found_times: List[str] = []
 
-    for node in candidates:
-        txt = node.get_text(" ", strip=True)
-        hhmm = extract_time_hhmm(txt)
+    for row in candidates:
+        hhmm = extract_time_from_row(row)
 
         if not hhmm or not is_before_or_equal(hhmm, latest):
             continue
 
-        if DEBUG and hhmm in {"06:00", "06:08", "06:16", "06:24"}:
-            print(course_name, hhmm, "avail=", len(re.findall(r"\bavailable\b", txt.lower())))
-        
-        if element_looks_bookable(node):
+        if row_looks_bookable(row):
             found_times.append(hhmm)
-
-    for hhmm in sorted(set(found_times)):
-        results.append(
-            TeeTime(
-                course=course_name,
-                play_date=play_date,
-                tee_time=hhmm,
-                players_hint=None,
-                booking_url=final_url,
-            )
-        )
 
     return sorted(results, key=lambda x: x.tee_time)
 
