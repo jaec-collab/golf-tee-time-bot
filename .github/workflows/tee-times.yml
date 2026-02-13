@@ -56,6 +56,17 @@ jobs:
           else
             echo "No summary file was generated (script likely failed)." >> $GITHUB_STEP_SUMMARY
           fi
+      - name: Create web page from summary
+        if: always()
+        run: |
+          mkdir -p docs
+          echo "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Golf Tee Times</title></head><body><h2>Latest Tee Times</h2><pre>" > docs/index.html
+          if [ -f tee_time_summary.md ]; then
+            cat tee_time_summary.md >> docs/index.html
+          else
+            echo "No results generated." >> docs/index.html
+          fi
+          echo "</pre></body></html>" >> docs/index.html
           
       - name: Upload debug artifacts
         if: always()
