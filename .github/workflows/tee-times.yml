@@ -23,6 +23,8 @@ jobs:
   lookup:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -67,6 +69,15 @@ jobs:
             echo "No results generated." >> docs/index.html
           fi
           echo "</pre></body></html>" >> docs/index.html
+          
+      - name: Commit updated web page
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git commit -m "Update tee times page" || exit 0
+          git push
           
       - name: Upload debug artifacts
         if: always()
