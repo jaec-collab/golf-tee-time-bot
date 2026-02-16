@@ -62,13 +62,41 @@ jobs:
         if: always()
         run: |
           mkdir -p docs
-          echo "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Golf Tee Times</title></head><body><h2>Latest Tee Times</h2><pre>" > docs/index.html
+          cat > docs/index.html <<'HTML'
+          <!doctype html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <meta http-equiv="refresh" content="120" />
+              <title>Golf Tee Times</title>
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.4; background:#f7f7f7; }
+                .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; background: #fff; }
+                .muted { color: #666; font-size: 14px; margin-top: 6px; }
+                pre { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; margin: 0; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h2 style="margin:0 0 10px 0;">Latest Tee Times</h2>
+                <div class="muted">Auto-refreshes every 2 minutes</div>
+                <hr />
+                <pre>
+          HTML
+
           if [ -f tee_time_summary.md ]; then
             cat tee_time_summary.md >> docs/index.html
           else
             echo "No results generated." >> docs/index.html
           fi
-          echo "</pre></body></html>" >> docs/index.html
+
+          cat >> docs/index.html <<'HTML'
+                </pre>
+              </div>
+            </body>
+          </html>
+          HTML
           
       - name: Commit updated web page
         if: always()
