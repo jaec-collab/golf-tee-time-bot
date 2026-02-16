@@ -167,10 +167,10 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
 
     # Find the "Players" column too (so we don't accidentally parse the time as a player count)
     col_players = None
-        for i, h in enumerate(headers):
-            if h.strip() == "players" or "players" in h:
-            col_players = i
-            break
+    for i, h in enumerate(headers):
+        if h.strip() == "players" or "players" in h:
+        col_players = i
+        break
         
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
