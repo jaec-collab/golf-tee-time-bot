@@ -165,6 +165,13 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
     if col_18 is None:
         return results
 
+    # Find the "Players" column too (so we don't accidentally parse the time as a player count)
+    col_players = None
+        for i, h in enumerate(headers):
+            if h.strip() == "players" or "players" in h:
+            col_players = i
+            break
+        
     time_re = re.compile(r"\b(\d{1,2}:\d{2}\s*(AM|PM))\b", re.IGNORECASE)
 
     # Rows with Select somewhere (cheaper filter)
@@ -196,7 +203,9 @@ def scrape_quick18_hamersley(play_date: str, min_players: int, latest: time) -> 
         booking_url = href if href.startswith("http") else f"{base_url}{href}"
 
         # Initialize hint early so later code can reference safely
-        players_hint = tr_text if tr_text else None
+        players_hint = None
+        if col_players is not None and col_players < len(row_cells):
+            players_hint = row_cells[col_players].get_text(" ", strip=True) or None
 
         # --- Validate min_players by opening the slot page ---
         slot_supports_min = True
