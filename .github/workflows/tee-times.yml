@@ -62,8 +62,51 @@ jobs:
         if: always()
         run: |
           mkdir -p docs
-          cat > docs/index.html <<'HTML'
-          <!doctype html>
+          python - <<'PY'
+          import re, html, datetime, pathlib
+
+          md_path = pathlib.Path("tee_time_summary.md")
+          md = md_path.read_text(encoding="utf-8") if md_path.exists() else "No results generated."
+
+          # Escape HTML first, then re-introduce formatting we want
+          s = html.escape(md)
+
+          # Headings
+          s = re.sub(r'(?m)^### (.+)$', r'<h3>\1</h3>', s)
+          s = re.sub(r'(?m)^## (.+)$',  r'<h2>\1</h2>', s)
+          s = re.sub(r'(?m)^# (.+)$',   r'<h1>\1</h1>', s)
+
+          # Bold **text**
+          s = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
+
+          # Markdown links [text](url) -> <a ...>
+          s = re.sub(r'\[([^\]]+)\]\((https?://[^)]+)\)', r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>', s)
+
+          # Bullets "- " -> <li>
+          lines = s.splitlines()
+          out = []
+          in_list = False
+          for line in lines:
+            if line.startswith("- "):
+              if not in_list:
+                out.append("<ul>")
+                in_list = True
+              out.append("<li>" + line[2:] + "</li>")
+            else:
+              if in_list:
+                out.append("</ul>")
+                in_list = False
+              if line.strip() == "":
+                out.append("<div style='height:8px'></div>")
+              else:
+                out.append("<p>" + line + "</p>")
+          if in_list:
+            out.append("</ul>")
+
+          body = "\n".join(out)
+          ts = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+          html_doc = f"""<!doctype html>
           <html>
             <head>
               <meta charset="utf-8" />
@@ -71,32 +114,31 @@ jobs:
               <meta http-equiv="refresh" content="120" />
               <title>Golf Tee Times</title>
               <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.4; background:#f7f7f7; }
-                .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; background: #fff; }
-                .muted { color: #666; font-size: 14px; margin-top: 6px; }
-                pre { white-space: pre-wrap; word-wrap: break-word; font-size: 14px; margin: 0; }
+                body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.35; background:#f7f7f7; }}
+                .card {{ border: 1px solid #ddd; border-radius: 14px; padding: 14px; background: #fff; }}
+                .muted {{ color: #666; font-size: 13px; margin-top: 6px; }}
+                h1 {{ font-size: 20px; margin: 0 0 10px 0; }}
+                h2 {{ font-size: 17px; margin: 16px 0 8px 0; }}
+                h3 {{ font-size: 15px; margin: 14px 0 6px 0; }}
+                ul {{ padding-left: 18px; }}
+                li {{ margin: 6px 0; }}
+                a {{ word-break: break-word; }}
+                p {{ margin: 6px 0; }}
               </style>
             </head>
             <body>
               <div class="card">
-                <h2 style="margin:0 0 10px 0;">Latest Tee Times</h2>
-                <div class="muted">Auto-refreshes every 2 minutes</div>
+                <h1>Latest Tee Times</h1>
+                <div class="muted">Updated: {ts} • Auto-refreshes every 2 minutes</div>
                 <hr />
-                <pre>
-          HTML
-
-          if [ -f tee_time_summary.md ]; then
-            cat tee_time_summary.md >> docs/index.html
-          else
-            echo "No results generated." >> docs/index.html
-          fi
-
-          cat >> docs/index.html <<'HTML'
-                </pre>
+                {body}
               </div>
             </body>
-          </html>
-          HTML
+          </html>"""
+
+          pathlib.Path("docs/index.html").write_text(html_doc, encoding="utf-8")
+          print("Wrote docs/index.html")
+          PY
           
       - name: Commit updated web page
         if: always()
