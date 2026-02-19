@@ -111,7 +111,29 @@ jobs:
             <head>
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <meta http-equiv="refresh" content="120" />
+
+              <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+              <meta http-equiv="Pragma" content="no-cache" />
+              <meta http-equiv="Expires" content="0" />
+
+              <script>
+                (function () {{
+                  const REFRESH_MS = 120000; // 2 minutes
+
+                  function bustReload() {{
+                    const u = new URL(window.location.href);
+                    u.searchParams.set("v", Date.now().toString());
+                    window.location.replace(u.toString());
+                  }}
+
+                  setTimeout(bustReload, REFRESH_MS);
+
+                  document.addEventListener("visibilitychange", () => {{
+                    if (!document.hidden) bustReload();
+                  }});
+                }})();
+              </script>
+
               <title>Golf Tee Times</title>
               <style>
                 body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.35; background:#f7f7f7; }}
