@@ -9,6 +9,12 @@
     <meta http-equiv="Expires" content="0" />
 
     <script>
+    if (!location.search.includes("v=")) {
+      location.replace(location.pathname + "?v=" + Date.now());
+    }
+    </script>
+    
+    <script>
       (function () {
         const REFRESH_MS = 120000; // 2 minutes
 
