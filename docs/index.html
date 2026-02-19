@@ -3,29 +3,6 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-
-    <script>
-      (function () {
-        const REFRESH_MS = 120000; // 2 minutes
-
-        function bustReload() {
-          const u = new URL(window.location.href);
-          u.searchParams.set("v", Date.now().toString());
-          window.location.replace(u.toString());
-        }
-
-        setTimeout(bustReload, REFRESH_MS);
-
-        document.addEventListener("visibilitychange", () => {
-          if (!document.hidden) bustReload();
-        });
-      })();
-    </script>
-
     <title>Golf Tee Times</title>
     <style>
       body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.35; background:#f7f7f7; }
@@ -33,72 +10,104 @@
       .muted { color: #666; font-size: 13px; margin-top: 6px; }
       h1 { font-size: 20px; margin: 0 0 10px 0; }
       h2 { font-size: 17px; margin: 16px 0 8px 0; }
-      h3 { font-size: 15px; margin: 14px 0 6px 0; }
       ul { padding-left: 18px; }
       li { margin: 6px 0; }
       a { word-break: break-word; }
-      p { margin: 6px 0; }
+      button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff; }
+      button:active { transform: scale(0.99); }
+      .row { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>Latest Tee Times</h1>
-      <div class="muted">Updated: 2026-02-19 03:24 UTC • Auto-refreshes every 2 minutes</div>
+      <div class="row">
+        <h1 style="margin:0;">Latest Tee Times</h1>
+        <button id="refreshBtn">Refresh now</button>
+      </div>
+      <div class="muted" id="status">Loading…</div>
       <hr />
-      <p><h1>Tee time lookup</h1></p>
-<div style='height:8px'></div>
-<ul>
-<li>Date: <strong>2026-02-24</strong></li>
-<li>Filter: <strong>2+ players</strong>, <strong>before 10:00</strong></li>
-<li>Tip: right-click a link (or Ctrl/Cmd-click) to open it in a new tab.</li>
-</ul>
-<div style='height:8px'></div>
-<p><h2>Collier Park Golf Course</h2></p>
-<div style='height:8px'></div>
-<ul>
-<li><strong>06:08</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>06:40</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>06:48</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:08</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:44</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:52</strong> 1 to 2 players  <a href="https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500257612&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-</ul>
-<p><h2>Hamersley Public Golf Course</h2></p>
-<div style='height:8px'></div>
-<ul>
-<li><strong>07:37</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240737?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>07:45</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240745?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>07:52</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240752?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:15</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240815?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:30</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240830?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:37</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240837?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:45</strong> 1 to 4 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240845?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:52</strong> 1 to 1 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240852?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:07</strong> 1 to 1 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240907?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:45</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240945?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:52</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602240952?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>10:00</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202602241000?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-</ul>
-<p><h2>Marangaroo Golf Course</h2></p>
-<div style='height:8px'></div>
-<ul>
-<li><strong>06:10</strong> 1 to 2 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>07:54</strong> 1 to 4 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:14</strong> 1 to 2 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:38</strong> 1 to 2 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:46</strong> 1 to 4 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>09:54</strong> 1 to 4 players  <a href="https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500406571&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-</ul>
-<p><h2>Whaleback Golf Course</h2></p>
-<div style='height:8px'></div>
-<ul>
-<li><strong>06:57</strong> 1 to 4 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>07:05</strong> 1 to 4 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:01</strong> 1 to 2 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:33</strong> 1 to 2 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:49</strong> 1 to 4 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-<li><strong>08:57</strong> 1 to 4 players  <a href="https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&amp;selectedDate=2026-02-24&amp;feeGroupId=1500344723&amp;mobile=true" target="_blank" rel="noopener noreferrer">open booking page</a></li>
-</ul>
+      <div id="content"></div>
     </div>
+
+    <script>
+      const REFRESH_MS = 120000; // 2 min
+
+      function escapeHtml(s) {
+        return (s ?? "").toString()
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function groupByCourse(results) {
+        const map = new Map();
+        for (const r of results) {
+          if (!map.has(r.course)) map.set(r.course, []);
+          map.get(r.course).push(r);
+        }
+        return map;
+      }
+
+      async function loadResults() {
+        const status = document.getElementById("status");
+        const content = document.getElementById("content");
+
+        try {
+          status.textContent = "Loading…";
+          content.innerHTML = "";
+
+          // cache-bust so iPhone actually fetches the new JSON
+          const url = "results.json?v=" + Date.now();
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) throw new Error("Could not load results.json (" + res.status + ")");
+
+          const data = await res.json();
+
+          status.textContent =
+            `Updated: ${data.updated_utc} • Date: ${data.play_date} • Filter: ${data.min_players}+ players before ${data.latest_time}`;
+
+          const byCourse = groupByCourse(data.results || []);
+          let html = "";
+
+          if (!data.results || data.results.length === 0) {
+            html += "<p>No tee times matched.</p>";
+          } else {
+            for (const [course, items] of byCourse.entries()) {
+              html += `<h2>${escapeHtml(course)}</h2><ul>`;
+              for (const r of items) {
+                const players = r.players ? ` ${escapeHtml(r.players)}` : "";
+                html += `<li><strong>${escapeHtml(r.tee_time)}</strong>${players} <a href="${escapeHtml(r.booking_url)}" target="_blank" rel="noopener noreferrer">open booking page</a></li>`;
+              }
+              html += "</ul>";
+            }
+          }
+
+          if (data.errors && data.errors.length) {
+            html += "<h2>Errors</h2><ul>";
+            for (const e of data.errors) {
+              html += `<li><strong>${escapeHtml(e.course)}</strong>: ${escapeHtml(e.message)} <a href="${escapeHtml(e.booking_url)}" target="_blank" rel="noopener noreferrer">open booking page</a></li>`;
+            }
+            html += "</ul>";
+          }
+
+          content.innerHTML = html;
+        } catch (err) {
+          status.textContent = "Failed to load results. Pull down / refresh and try again.";
+          content.innerHTML = `<p class="muted">${escapeHtml(err.message || err)}</p>`;
+        }
+      }
+
+      document.getElementById("refreshBtn").addEventListener("click", loadResults);
+
+      loadResults();
+      setInterval(loadResults, REFRESH_MS);
+
+      // also refresh when you come back to the tab
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) loadResults();
+      });
+    </script>
   </body>
 </html>
