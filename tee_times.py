@@ -1,5 +1,7 @@
 import os
 import re
+import json
+from typing import Dict
 from dataclasses import dataclass
 from datetime import time
 from typing import List, Optional
@@ -658,6 +660,51 @@ def main():
     with open("tee_time_summary.md", "w", encoding="utf-8") as f:
         f.write(md)
 
+    # --- App-style output: docs/results.json ---
+    os.makedirs("docs", exist_ok=True)
+
+    payload = {
+        "updated_utc": __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "play_date": play_date,
+        "min_players": min_players,
+        "latest_time": latest_time_str,
+        "results": [],
+        "errors": [],
+    }
+
+    for r in good_sorted:
+        # Convert players_hint into "1 to X players" if possible
+        max_players = None
+        if r.players_hint is not None:
+            try:
+                max_players = int(r.players_hint)
+            except Exception:
+                # if it's already a string like "up to 4 players"
+                nums = [int(x) for x in re.findall(r"\d+", str(r.players_hint))]
+                max_players = max(nums) if nums else None
+
+        hint = f"1 to {max_players} players" if max_players else None
+
+        payload["results"].append(
+            {
+                "course": r.course,
+                "tee_time": r.tee_time,
+                "players": hint,
+                "booking_url": r.booking_url,
+            }
+        )
+
+    for r in bad:
+        payload["errors"].append(
+            {
+                "course": r.course,
+                "message": str(r.players_hint) if r.players_hint else "Unknown error",
+                "booking_url": r.booking_url,
+            }
+        )
+
+    with open("docs/results.json", "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
 if __name__ == "__main__":
     main()
