@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="120" />
     <title>Golf Tee Times</title>
     <style>
       body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; line-height: 1.35; background:#f7f7f7; }
@@ -10,78 +11,32 @@
       .muted { color: #666; font-size: 13px; margin-top: 6px; }
       h1 { font-size: 20px; margin: 0 0 10px 0; }
       h2 { font-size: 17px; margin: 16px 0 8px 0; }
+      h3 { font-size: 15px; margin: 14px 0 6px 0; }
       ul { padding-left: 18px; }
       li { margin: 6px 0; }
       a { word-break: break-word; }
-      .pill { display:inline-block; font-size:12px; padding:2px 8px; border:1px solid #ddd; border-radius:999px; background:#fafafa; margin-left:6px; }
-      button { border:1px solid #ddd; background:#fff; padding:8px 10px; border-radius:10px; }
+      p { margin: 6px 0; }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>Latest Tee Times</h1>
-      <div class="muted" id="meta">Loading…</div>
-      <div style="margin-top:10px;">
-        <button onclick="load(true)">Refresh now</button>
-        <span class="pill" id="status"></span>
-      </div>
+      <div class="muted">Updated: 2026-02-19 01:48 UTC • Auto-refreshes every 2 minutes</div>
       <hr />
-      <div id="content"></div>
+      <p><h1>Tee time lookup</h1></p>
+<div style='height:8px'></div>
+<ul>
+<li>Date: <strong>2026-03-03</strong></li>
+<li>Filter: <strong>2+ players</strong>, <strong>before 10:00</strong></li>
+<li>Tip: right-click a link (or Ctrl/Cmd-click) to open it in a new tab.</li>
+</ul>
+<div style='height:8px'></div>
+<p><h2>Hamersley Public Golf Course</h2></p>
+<div style='height:8px'></div>
+<ul>
+<li><strong>09:15</strong> 1 to 1 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202603030915?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
+<li><strong>09:45</strong> 1 to 2 players  <a href="https://hamersley.quick18.com/teetimes/course/1160/teetime/202603030945?psid=6546&amp;p=0" target="_blank" rel="noopener noreferrer">open booking page</a></li>
+</ul>
     </div>
-
-    <script>
-      async function load(forceBust=false) {
-        const ts = forceBust ? Date.now() : Math.floor(Date.now()/60000); // changes every minute
-        const url = `results.json?ts=${ts}`;
-
-        document.getElementById("status").textContent = "fetching…";
-
-        const res = await fetch(url, { cache: "no-store" });
-        const data = await res.json();
-
-        document.getElementById("meta").textContent =
-          `Updated: ${data.generated_utc} • Auto-refresh every 2 minutes`;
-
-        const byCourse = {};
-        for (const r of data.results) {
-          (byCourse[r.course] ||= []).push(r);
-        }
-
-        const content = document.getElementById("content");
-        content.innerHTML = `
-          <ul>
-            <li>Date: <strong>${data.play_date}</strong></li>
-            <li>Filter: <strong>${data.min_players}+ players</strong>, <strong>before ${data.latest_time}</strong></li>
-          </ul>
-        `;
-
-        for (const course of Object.keys(byCourse).sort()) {
-          const h2 = document.createElement("h2");
-          h2.textContent = course;
-          content.appendChild(h2);
-
-          const ul = document.createElement("ul");
-          for (const r of byCourse[course]) {
-            const li = document.createElement("li");
-            const maxPlayers = r.players_hint ?? "";
-            const playersText = maxPlayers !== "" ? ` 1 to ${maxPlayers} players` : "";
-            li.innerHTML = `<strong>${r.tee_time}</strong>${playersText} <a href="${r.booking_url}" target="_blank" rel="noopener noreferrer">open booking page</a>`;
-            ul.appendChild(li);
-          }
-          content.appendChild(ul);
-        }
-
-        document.getElementById("status").textContent = "ok";
-      }
-
-      load().catch(err => {
-        document.getElementById("status").textContent = "error";
-        document.getElementById("meta").textContent = "Failed to load results.json";
-        console.error(err);
-      });
-
-      // refresh every 2 minutes
-      setInterval(() => load(false), 120000);
-    </script>
   </body>
 </html>
