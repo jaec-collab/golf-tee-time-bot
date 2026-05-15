@@ -1,15 +1,8 @@
 {
-  "updated_utc": "2026-03-19 01:09:53 UTC",
-  "play_date": "2026-03-21",
+  "updated_utc": "2026-05-15 01:43:26 UTC",
+  "play_date": "2026-05-24",
   "min_players": 2,
   "latest_time": "10:00",
-  "results": [
-    {
-      "course": "Hamersley Public Golf Course",
-      "tee_time": "09:22",
-      "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202603210922?psid=6546&p=0"
-    }
-  ],
+  "results": [],
   "errors": []
 }
