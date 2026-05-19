@@ -1,38 +1,32 @@
 {
-  "updated_utc": "2026-05-19 12:49:12 UTC",
-  "play_date": "2026-05-25",
+  "updated_utc": "2026-05-19 12:51:51 UTC",
+  "play_date": "2026-06-01",
   "min_players": 2,
   "latest_time": "10:00",
   "results": [
     {
       "course": "Hamersley Public Golf Course",
-      "tee_time": "07:36",
+      "tee_time": "07:34",
       "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202605250736?psid=6546&p=0"
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202606010734?psid=6546&p=0"
     },
     {
       "course": "Hamersley Public Golf Course",
-      "tee_time": "07:44",
-      "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202605250744?psid=6546&p=0"
+      "tee_time": "07:51",
+      "players": "1 to 2 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202606010751?psid=6546&p=0"
     },
     {
       "course": "Hamersley Public Golf Course",
-      "tee_time": "07:53",
+      "tee_time": "08:08",
       "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202605250753?psid=6546&p=0"
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202606010808?psid=6546&p=0"
     },
     {
       "course": "Hamersley Public Golf Course",
-      "tee_time": "08:10",
-      "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202605250810?psid=6546&p=0"
-    },
-    {
-      "course": "Hamersley Public Golf Course",
-      "tee_time": "08:27",
-      "players": "1 to 1 players",
-      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202605250827?psid=6546&p=0"
+      "tee_time": "08:16",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202606010816?psid=6546&p=0"
     }
   ],
   "errors": []
