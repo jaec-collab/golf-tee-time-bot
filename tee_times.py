@@ -356,8 +356,35 @@ def scrape_miclub_public_calendar(
     safe = re.sub(r"[^a-z0-9]+", "_", course_name.lower()).strip("_")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ],
+        )
+
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                "Version/18.0 Mobile/15E148 Safari/604.1"
+            ),
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=3,
+            is_mobile=True,
+            has_touch=True,
+            locale="en-AU",
+            timezone_id="Australia/Perth",
+            extra_http_headers={
+                "Accept-Language": "en-AU,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+        )
+
+        page = context.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         # The fee grid is rendered client-side (jQuery), so a fixed sleep
         # here is a race: under CI load it can fire before any price cell
