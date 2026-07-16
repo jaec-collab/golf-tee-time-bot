@@ -382,26 +382,73 @@ def scrape_miclub_public_calendar(
             except Exception:
                 pass
 
-        # -------- CLICK THROUGH TO THE DAY TIMESHEET --------
+                # -------- CLICK THROUGH TO THE DAY TIMESHEET --------
         clicked = False
+        price_re = re.compile(r"\$\s*\d+(?:\.\d{2})?", re.IGNORECASE)
 
-        # Strategy A: 18 Holes row -> click a price
-        # Some courses (e.g. Whaleback) label this category "18 Hole" singular
-        # on the calendar grid, so the trailing "s" must be optional here.
         try:
-            row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes?\b", re.IGNORECASE))
-            if row18.count() == 0:
-                row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes?\b", re.IGNORECASE))
+            # Find the specific product label, rather than a large parent div
+            label18 = page.get_by_text(
+                re.compile(r"^\s*18\s*Holes?\s*$", re.IGNORECASE)
+            ).first
+
+            label18.wait_for(state="visible", timeout=15_000)
+
+            # Find the closest calendar row containing that 18-hole label
+            row18 = label18.locator(
+                "xpath=ancestor::*[self::tr "
+                "or contains(concat(' ', normalize-space(@class), ' '), ' row ')][1]"
+            )
 
             if row18.count() > 0:
-                price_cells = row18.first.locator(r"text=/\$\s*\d+(?:\.\d{2})?/")
-                if price_cells.count() > 0:
-                    price_cells.first.click(timeout=15_000)
-                    clicked = True
-        except Exception:
-            clicked = False
+                # Prefer an actual clickable control containing a price
+                clickable_prices = row18.locator(
+                    "a, button, [role='button'], [onclick]"
+                ).filter(has_text=price_re)
 
-        # Strategy B: click any visible price
+                if clickable_prices.count() > 0:
+                    clickable_prices.first.click(timeout=15_000)
+                    clicked = True
+                else:
+                    # Sometimes the price text is inside a clickable parent
+                    price_text = row18.get_by_text(price_re).first
+                    price_text.wait_for(state="visible", timeout=15_000)
+
+                    price_text.evaluate(
+                        """
+                        element => {
+                            const target = element.closest(
+                                "a, button, [role='button'], [onclick]"
+                            ) || element;
+                            target.click();
+                        }
+                        """
+                    )
+                    clicked = True
+
+        except Exception as first_error:
+            print(f"[{course_name}] 18-hole row click failed: {first_error}")
+
+        # Fallback: use the first visible price anywhere on the grid
+        if not clicked:
+            try:
+                fallback_price = page.get_by_text(price_re).first
+                fallback_price.wait_for(state="visible", timeout=15_000)
+
+                fallback_price.evaluate(
+                    """
+                    element => {
+                        const target = element.closest(
+                            "a, button, [role='button'], [onclick]"
+                        ) || element;
+                        target.click();
+                    }
+                    """
+                )
+                clicked = True
+
+            except Exception as fallback_error:
+                print(f"[{course_name}] fallback price click failed: {fallback_error}")
         if not clicked:
             try:
                 page.locator(r"text=/\$\s*\d+(?:\.\d{2})?/").first.click(timeout=15_000)
