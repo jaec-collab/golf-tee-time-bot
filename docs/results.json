@@ -1,8 +1,57 @@
 {
-  "updated_local": "2026-07-16 14:53:25 AWST",
-  "play_date": "2026-07-18",
+  "updated_local": "2026-07-16 15:09:05 AWST",
+  "play_date": "2026-07-20",
   "min_players": 2,
-  "latest_time": "10:00",
-  "results": [],
+  "latest_time": "13:00",
+  "results": [
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "07:42",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607200742?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "11:32",
+      "players": "1 to 1 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201132?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "11:40",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201140?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "11:49",
+      "players": "1 to 2 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201149?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "11:57",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201157?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "12:06",
+      "players": "1 to 2 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201206?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "12:14",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201214?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "12:23",
+      "players": "1 to 4 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201223?psid=6546&p=0"
+    }
+  ],
   "errors": []
 }
