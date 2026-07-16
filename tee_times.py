@@ -638,33 +638,30 @@ def main():
         ),
     ]
 
-    # Each course scrape opens its own Playwright instance, so they can run
-    # concurrently in separate threads instead of one-by-one.
-    jobs = []
+    miclub_jobs = []
     for name, template in miclub_courses:
-        jobs.append((
+        miclub_jobs.append((
             name,
             template.format(date=play_date),
             lambda n=name, t=template: scrape_miclub_public_calendar(n, t, play_date, min_players, latest),
         ))
-    jobs.append((
-        "Hamersley Public Golf Course",
-        f"https://hamersley.quick18.com/teetimes/searchmatrix?teedate={play_date.replace('-', '')}",
-        lambda: scrape_quick18_hamersley(play_date, min_players, latest),
-    ))
+    hamersley_name = "Hamersley Public Golf Course"
+    hamersley_url = f"https://hamersley.quick18.com/teetimes/searchmatrix?teedate={play_date.replace('-', '')}"
 
-    # Cap concurrency: GitHub-hosted runners only have ~2 CPU cores, and each
-    # job drives its own headless Chromium. Running all of them at once causes
-    # CPU contention that can make click/navigation steps time out silently
-    # (looking identical to "nothing available"). 2 workers still cuts total
-    # runtime roughly in half without starving any single browser.
     all_results: List[TeeTime] = []
-    with ThreadPoolExecutor(max_workers=min(2, len(jobs))) as executor:
-        future_to_job = {executor.submit(fn): (name, booking_url) for name, booking_url, fn in jobs}
-        for future in future_to_job:
-            name, booking_url = future_to_job[future]
+
+    # Collier Park / Marangaroo / Whaleback all run on the same shared MiClub
+    # platform. Running them concurrently previously triggered that platform's
+    # infrastructure to block/rate-limit the runner's IP outright (every click
+    # silently failed - not a timing issue, the pages simply stopped being
+    # served). They must run one at a time, never overlapping. Hamersley is a
+    # completely separate platform, so it's safe to run in parallel with them.
+    with ThreadPoolExecutor(max_workers=1) as hamersley_executor:
+        hamersley_future = hamersley_executor.submit(scrape_quick18_hamersley, play_date, min_players, latest)
+
+        for name, booking_url, fn in miclub_jobs:
             try:
-                all_results += future.result()
+                all_results += fn()
             except Exception as e:
                 all_results.append(
                     TeeTime(
@@ -675,6 +672,19 @@ def main():
                         booking_url=booking_url,
                     )
                 )
+
+        try:
+            all_results += hamersley_future.result()
+        except Exception as e:
+            all_results.append(
+                TeeTime(
+                    course=hamersley_name,
+                    play_date=play_date,
+                    tee_time="",
+                    players_hint=f"ERROR: {e}",
+                    booking_url=hamersley_url,
+                )
+            )
 
     good = [r for r in all_results if r.tee_time]
     bad = [r for r in all_results if not r.tee_time]
