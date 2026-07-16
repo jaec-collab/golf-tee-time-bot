@@ -1,14 +1,26 @@
 {
-  "updated_utc": "2026-07-16 01:15:32 UTC",
+  "updated_utc": "2026-07-16 01:44:44 UTC",
   "play_date": "20/7/2026, 12:00 pm",
   "min_players": 2,
-  "latest_time": "10:00",
+  "latest_time": "14:00",
   "results": [
     {
       "course": "Hamersley Public Golf Course",
       "tee_time": "09:50",
       "players": "1 to 1 players",
       "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607160950?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "12:06",
+      "players": "1 to 1 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607161206?psid=6546&p=0"
+    },
+    {
+      "course": "Hamersley Public Golf Course",
+      "tee_time": "12:14",
+      "players": "1 to 1 players",
+      "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607161214?psid=6546&p=0"
     }
   ],
   "errors": []
