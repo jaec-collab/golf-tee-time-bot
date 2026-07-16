@@ -619,10 +619,6 @@ def main():
             "Whaleback Golf Course",
             "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicCalendar.msp?booking_resource_id=3000000&mobile=true&selectedDate={date}",
         ),
-        (
-            "Wembley Golf Complex",
-            "https://www.wembleygolf.com.au/guests/bookings/ViewPublicCalendar.msp?booking_resource_id=3000000&mobile=true&selectedDate={date}",
-        ),
     ]
 
     # Each course scrape opens its own Playwright instance, so they can run
