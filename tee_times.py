@@ -5,6 +5,7 @@ from typing import Dict
 from dataclasses import dataclass
 from datetime import time
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from bs4 import BeautifulSoup
 from dateutil import parser as dtparser
@@ -620,36 +621,38 @@ def main():
         ),
     ]
 
-    all_results: List[TeeTime] = []
-
-    # MiClub (best effort for now)
+    # Each course scrape opens its own Playwright instance, so they can run
+    # concurrently in separate threads instead of one-by-one.
+    jobs = []
     for name, template in miclub_courses:
-        try:
-            all_results += scrape_miclub_public_calendar(name, template, play_date, min_players, latest)
-        except Exception as e:
-            all_results.append(
-                TeeTime(
-                    course=name,
-                    play_date=play_date,
-                    tee_time="",
-                    players_hint=f"ERROR: {e}",
-                    booking_url=template.format(date=play_date),
-                )
-            )
+        jobs.append((
+            name,
+            template.format(date=play_date),
+            lambda n=name, t=template: scrape_miclub_public_calendar(n, t, play_date, min_players, latest),
+        ))
+    jobs.append((
+        "Hamersley Public Golf Course",
+        f"https://hamersley.quick18.com/teetimes/searchmatrix?teedate={play_date.replace('-', '')}",
+        lambda: scrape_quick18_hamersley(play_date, min_players, latest),
+    ))
 
-    # Hamersley Quick18
-    try:
-        all_results += scrape_quick18_hamersley(play_date, min_players, latest)
-    except Exception as e:
-        all_results.append(
-            TeeTime(
-                course="Hamersley Public Golf Course",
-                play_date=play_date,
-                tee_time="",
-                players_hint=f"ERROR: {e}",
-                booking_url=f"https://hamersley.quick18.com/teetimes/searchmatrix?teedate={play_date.replace('-', '')}",
-            )
-        )
+    all_results: List[TeeTime] = []
+    with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
+        future_to_job = {executor.submit(fn): (name, booking_url) for name, booking_url, fn in jobs}
+        for future in future_to_job:
+            name, booking_url = future_to_job[future]
+            try:
+                all_results += future.result()
+            except Exception as e:
+                all_results.append(
+                    TeeTime(
+                        course=name,
+                        play_date=play_date,
+                        tee_time="",
+                        players_hint=f"ERROR: {e}",
+                        booking_url=booking_url,
+                    )
+                )
 
     good = [r for r in all_results if r.tee_time]
     bad = [r for r in all_results if not r.tee_time]
