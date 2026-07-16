@@ -1,5 +1,5 @@
 {
-  "updated_local": "2026-07-16 15:09:05 AWST",
+  "updated_local": "2026-07-16 15:27:45 AWST",
   "play_date": "2026-07-20",
   "min_players": 2,
   "latest_time": "13:00",
@@ -53,5 +53,21 @@
       "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201223?psid=6546&p=0"
     }
   ],
-  "errors": []
+  "errors": [
+    {
+      "course": "Collier Park Golf Course",
+      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicCalendar.msp?mobile=true&selectedDate=2026-07-20"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicCalendar.msp?mobile=true&selectedDate=2026-07-20"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicCalendar.msp?booking_resource_id=3000000&mobile=true&selectedDate=2026-07-20"
+    }
+  ]
 }
