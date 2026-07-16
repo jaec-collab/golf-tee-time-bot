@@ -3,9 +3,10 @@ import re
 import json
 from typing import Dict
 from dataclasses import dataclass
-from datetime import time
+from datetime import datetime, time
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 from dateutil import parser as dtparser
@@ -667,7 +668,7 @@ def main():
     os.makedirs("docs", exist_ok=True)
 
     payload = {
-        "updated_utc": __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "updated_local": datetime.now(ZoneInfo("Australia/Perth")).strftime("%Y-%m-%d %H:%M:%S AWST"),
         "play_date": play_date,
         "min_players": min_players,
         "latest_time": latest_time_str,
