@@ -359,7 +359,16 @@ def scrape_miclub_public_calendar(
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-        page.wait_for_timeout(1500)
+        # The fee grid is rendered client-side (jQuery), so a fixed sleep
+        # here is a race: under CI load it can fire before any price cell
+        # exists, making every click strategy below find nothing to click
+        # (count() doesn't wait/retry, unlike click()/waitFor()). Wait for
+        # actual price text to show up instead, with a generous budget.
+        try:
+            page.wait_for_selector(r"text=/\$\s*\d+(?:\.\d{2})?/", timeout=20_000)
+        except Exception:
+            pass
+        page.wait_for_timeout(500)
 
         # --- DEBUG: grid page ---
         if DEBUG:
