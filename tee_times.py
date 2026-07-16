@@ -377,10 +377,12 @@ def scrape_miclub_public_calendar(
         clicked = False
 
         # Strategy A: 18 Holes row -> click a price
+        # Some courses (e.g. Whaleback) label this category "18 Hole" singular
+        # on the calendar grid, so the trailing "s" must be optional here.
         try:
-            row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
+            row18 = page.locator("tr", has_text=re.compile(r"\b18\s*Holes?\b", re.IGNORECASE))
             if row18.count() == 0:
-                row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes\b", re.IGNORECASE))
+                row18 = page.locator(":is(tr,div)", has_text=re.compile(r"\b18\s*Holes?\b", re.IGNORECASE))
 
             if row18.count() > 0:
                 price_cells = row18.first.locator(r"text=/\$\s*\d+(?:\.\d{2})?/")
