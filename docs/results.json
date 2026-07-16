@@ -1,9 +1,51 @@
 {
-  "updated_local": "2026-07-16 16:31:08 AWST",
+  "updated_local": "2026-07-17 07:54:16 AWST",
   "play_date": "2026-07-20",
   "min_players": 2,
   "latest_time": "13:00",
   "results": [
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "07:44",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "11:20",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "11:28",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "11:36",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "11:44",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "11:52",
+      "players": "1 to 2 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
+    {
+      "course": "Collier Park Golf Course",
+      "tee_time": "12:48",
+      "players": "1 to 4 players",
+      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500257612&mobile=true"
+    },
     {
       "course": "Hamersley Public Golf Course",
       "tee_time": "07:34",
@@ -13,7 +55,7 @@
     {
       "course": "Hamersley Public Golf Course",
       "tee_time": "07:42",
-      "players": "1 to 4 players",
+      "players": "1 to 1 players",
       "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607200742?psid=6546&p=0"
     },
     {
@@ -57,23 +99,157 @@
       "tee_time": "12:23",
       "players": "1 to 4 players",
       "booking_url": "https://hamersley.quick18.com/teetimes/course/1160/teetime/202607201223?psid=6546&p=0"
-    }
-  ],
-  "errors": [
-    {
-      "course": "Collier Park Golf Course",
-      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
-      "booking_url": "https://bookings.collierparkgolf.com.au/guests/bookings/ViewPublicCalendar.msp?mobile=true&selectedDate=2026-07-20"
     },
     {
       "course": "Marangaroo Golf Course",
-      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
-      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicCalendar.msp?mobile=true&selectedDate=2026-07-20"
+      "tee_time": "09:46",
+      "players": "1 to 2 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "10:42",
+      "players": "1 to 2 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "10:50",
+      "players": "1 to 2 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:06",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:14",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:22",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:30",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:38",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:46",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "11:54",
+      "players": "1 to 2 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:18",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:26",
+      "players": "1 to 3 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:34",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:42",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:50",
+      "players": "1 to 4 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
+    },
+    {
+      "course": "Marangaroo Golf Course",
+      "tee_time": "12:58",
+      "players": "1 to 2 players",
+      "booking_url": "https://marangaroo.miclub.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500406571&mobile=true"
     },
     {
       "course": "Whaleback Golf Course",
-      "message": "ERROR: Could not click into a price cell to reach the day timesheet",
-      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicCalendar.msp?booking_resource_id=3000000&mobile=true&selectedDate=2026-07-20"
+      "tee_time": "11:29",
+      "players": "1 to 2 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "11:45",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "11:53",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:01",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:09",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:33",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:41",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:49",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
+    },
+    {
+      "course": "Whaleback Golf Course",
+      "tee_time": "12:57",
+      "players": "1 to 4 players",
+      "booking_url": "https://www.whalebackgolfcourse.com.au/guests/bookings/ViewPublicTimesheet.msp?bookingResourceId=3000000&selectedDate=2026-07-20&feeGroupId=1500344723&mobile=true"
     }
-  ]
+  ],
+  "errors": []
 }
