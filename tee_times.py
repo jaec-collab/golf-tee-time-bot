@@ -385,7 +385,7 @@ def scrape_miclub_public_calendar(
             if row18.count() > 0:
                 price_cells = row18.first.locator(r"text=/\$\s*\d+(?:\.\d{2})?/")
                 if price_cells.count() > 0:
-                    price_cells.first.click(timeout=5_000)
+                    price_cells.first.click(timeout=15_000)
                     clicked = True
         except Exception:
             clicked = False
@@ -393,7 +393,7 @@ def scrape_miclub_public_calendar(
         # Strategy B: click any visible price
         if not clicked:
             try:
-                page.locator(r"text=/\$\s*\d+(?:\.\d{2})?/").first.click(timeout=5_000)
+                page.locator(r"text=/\$\s*\d+(?:\.\d{2})?/").first.click(timeout=15_000)
                 clicked = True
             except Exception:
                 clicked = False
@@ -401,18 +401,23 @@ def scrape_miclub_public_calendar(
         # Strategy C: click any obvious link/button
         if not clicked:
             try:
-                page.locator("table a, table button, a, button").first.click(timeout=5_000)
+                page.locator("table a, table button, a, button").first.click(timeout=15_000)
                 clicked = True
             except Exception:
                 clicked = False
 
         if not clicked:
             browser.close()
-            return results
+            # Raise instead of silently returning empty: a genuine "nothing
+            # available" case never reaches this branch (that's decided by
+            # the row parsing below), so getting here means the click
+            # itself failed/timed out and should surface as a visible error
+            # rather than look identical to "no tee times".
+            raise RuntimeError("Could not click into a price cell to reach the day timesheet")
 
         # Wait for navigation or in-place update
         try:
-            page.wait_for_load_state("networkidle", timeout=10_000)
+            page.wait_for_load_state("networkidle", timeout=20_000)
         except Exception:
             pass
         page.wait_for_timeout(1200)
@@ -637,8 +642,13 @@ def main():
         lambda: scrape_quick18_hamersley(play_date, min_players, latest),
     ))
 
+    # Cap concurrency: GitHub-hosted runners only have ~2 CPU cores, and each
+    # job drives its own headless Chromium. Running all of them at once causes
+    # CPU contention that can make click/navigation steps time out silently
+    # (looking identical to "nothing available"). 2 workers still cuts total
+    # runtime roughly in half without starving any single browser.
     all_results: List[TeeTime] = []
-    with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
+    with ThreadPoolExecutor(max_workers=min(2, len(jobs))) as executor:
         future_to_job = {executor.submit(fn): (name, booking_url) for name, booking_url, fn in jobs}
         for future in future_to_job:
             name, booking_url = future_to_job[future]
